@@ -1,0 +1,32 @@
+# Reference repos (cloned for analysis, not our code)
+reference/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tgz
+
+# Bun
+bun.lockb
+
+# SQLite
+*.db
+*.db-wal
+*.db-shm
+
+# Auth
+auth.json
+auth.lock
+
+# Checkpoint files
+.reddit-import-checkpoint.json
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
