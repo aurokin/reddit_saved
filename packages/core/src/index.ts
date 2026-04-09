@@ -48,6 +48,7 @@ export {
   VERSION,
   USER_AGENT_TEMPLATE,
   DEFAULT_REDIRECT_PORT,
+  DEFAULT_OAUTH_HOST,
   OAUTH_REDIRECT_URI,
   OAUTH_TIMEOUT_MS,
   OAUTH_SCOPES,
@@ -85,6 +86,7 @@ export {
   CONTENT_ORIGIN_UPVOTED,
   CONTENT_ORIGIN_SUBMITTED,
   CONTENT_ORIGIN_COMMENTED,
+  CONTENT_ORIGINS,
   COMMENT_MAX_TOP_LEVEL,
   COMMENT_MAX_DEPTH,
   COMMENT_CONTEXT_MAX,
@@ -123,6 +125,8 @@ export {
   dropFtsTriggers,
   createFtsTriggers,
 } from "./storage/schema";
+export { exportToJson, exportToCsv, exportToMarkdown } from "./storage/json-export";
+export type { ExportOptions, ExportMetadata } from "./storage/json-export";
 
 // Tags
 export { TagManager } from "./tags/tag-manager";

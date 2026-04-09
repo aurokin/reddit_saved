@@ -1,15 +1,15 @@
-import type { RequestParams, RequestResponse } from "../types";
 import {
-  MAX_REQUEST_RETRIES,
-  RATE_LIMIT_TOKENS,
-  RATE_LIMIT_INTERVAL_MS,
+  BACKOFF_MAX_DELAY_MS,
   CIRCUIT_BREAKER_FAILURE_THRESHOLD,
   CIRCUIT_BREAKER_RESET_TIMEOUT_MS,
-  BACKOFF_MAX_DELAY_MS,
+  MAX_REQUEST_RETRIES,
+  RATE_LIMIT_INTERVAL_MS,
+  RATE_LIMIT_TOKENS,
 } from "../constants";
+import type { RequestParams, RequestResponse } from "../types";
 import { CircuitBreaker, type CircuitBreakerConfig, type CircuitState } from "./circuit-breaker";
-import { RateLimiter } from "./rate-limiter";
 import { OfflineQueue, type RequestPriority } from "./offline-queue";
+import { RateLimiter } from "./rate-limiter";
 
 // ============================================================================
 // Config
@@ -17,6 +17,8 @@ import { OfflineQueue, type RequestPriority } from "./offline-queue";
 
 export interface RequestQueueConfig {
   maxConcurrent: number;
+  /** Per-attempt HTTP timeout in ms. Note: retries reset the budget, so this
+   *  bounds each individual HTTP attempt, not total wall-clock time. */
   defaultTimeoutMs: number;
   maxRetries: number;
   baseBackoffMs: number;
@@ -97,7 +99,10 @@ export class RequestQueue {
       circuitBreaker: { ...DEFAULT_CONFIG.circuitBreaker, ...config.circuitBreaker },
     };
     this.circuitBreaker = new CircuitBreaker(this.config.circuitBreaker);
-    this.rateLimiter = new RateLimiter(this.config.rateLimitRequests, this.config.rateLimitWindowMs);
+    this.rateLimiter = new RateLimiter(
+      this.config.rateLimitRequests,
+      this.config.rateLimitWindowMs,
+    );
     this.offlineQueue = new OfflineQueue();
   }
 
@@ -140,6 +145,10 @@ export class RequestQueue {
     this.processQueue();
   }
 
+  /** Set online/offline state. When transitioning to online, buffered offline
+   *  requests are re-enqueued as new fire-and-forget requests. The original
+   *  callers' promises were already rejected with "Offline" and are not settled
+   *  by the re-enqueued requests. */
   setOnline(online: boolean): void {
     const wasOffline = !this.isOnline;
     this.isOnline = online;
@@ -164,6 +173,9 @@ export class RequestQueue {
     };
   }
 
+  /** Reject all queued (not yet dispatched) requests and clear the offline queue.
+   *  In-flight requests are NOT aborted — pass an AbortSignal via params.signal
+   *  if cancellation of active requests is needed. */
   clear(): void {
     for (const request of this.queue) {
       request.reject(new Error("Queue cleared"));
@@ -190,7 +202,11 @@ export class RequestQueue {
     this.isProcessing = true;
 
     try {
-      while (this.queue.length > 0 && this.activeRequests < this.config.maxConcurrent && !this.isPaused) {
+      while (
+        this.queue.length > 0 &&
+        this.activeRequests < this.config.maxConcurrent &&
+        !this.isPaused
+      ) {
         // Discard expired requests before consuming circuit breaker or rate limiter budget
         while (this.queue.length > 0) {
           const head = this.queue[0]!;
@@ -206,7 +222,13 @@ export class RequestQueue {
         if (!this.isOnline) {
           for (const req of this.queue) {
             const stored = this.offlineQueue.add(req.params, req.priority);
-            req.reject(new Error(stored ? "Offline: request queued for later" : "Offline: queue full, request dropped"));
+            req.reject(
+              new Error(
+                stored
+                  ? "Offline: request queued for later"
+                  : "Offline: queue full, request dropped",
+              ),
+            );
           }
           this.queue = [];
           break;
@@ -255,7 +277,21 @@ export class RequestQueue {
     let cbHandled = false;
 
     try {
-      const response = await this.doFetch(request.params, request.timeout);
+      // Deduct queue-wait time from the HTTP timeout budget so the total
+      // wall-clock time (queue + fetch) never exceeds the requested timeout.
+      // Retries reset addedAt (lines below), so retried requests get a fresh budget.
+      const elapsed = Date.now() - request.addedAt;
+      const budget = request.timeout - elapsed;
+      if (budget <= 0) {
+        // Budget already exhausted while waiting in queue — reject immediately
+        // rather than granting an extended lease via the 1s floor.
+        this.circuitBreaker.releaseProbe();
+        request.reject(new DOMException("The operation timed out.", "TimeoutError"));
+        return;
+      }
+      // Floor at 1s so very-small-but-positive budgets still allow a real HTTP attempt
+      const remainingTimeout = Math.max(1000, budget);
+      const response = await this.doFetch(request.params, remainingTimeout);
 
       // Update rate limiter from Reddit's response headers.
       // Guard against malformed headers — NaN tokens would permanently stall the queue.
@@ -314,13 +350,12 @@ export class RequestQueue {
       if (err.status === 429) {
         this.circuitBreaker.releaseProbe();
         const rawRetryAfter = Number.parseInt(err.headers?.get("retry-after") ?? "", 10);
-        const retryAfter = Number.isFinite(rawRetryAfter) && rawRetryAfter > 0
-          ? rawRetryAfter * 1000
-          : 60_000;
+        const retryAfter =
+          Number.isFinite(rawRetryAfter) && rawRetryAfter > 0 ? rawRetryAfter * 1000 : 60_000;
         if (request.retryCount < request.maxRetries) {
           request.retryCount++;
-          request.addedAt = Date.now(); // reset so queue-timeout doesn't expire this retry
           setTimeout(() => {
+            request.addedAt = Date.now(); // stamp at re-queue time, not scheduling time
             this.insertByPriority(request);
             this.processQueue();
           }, retryAfter);
@@ -335,18 +370,22 @@ export class RequestQueue {
       // Skip if the inner stream-read catch already handled this error's circuit breaker effect.
       if (!cbHandled && isCircuitBreakerFault(err)) {
         this.circuitBreaker.recordFailure();
+      } else if (!cbHandled) {
+        // Non-fault error (e.g. 4xx, unexpected throw) — release probe so
+        // circuit breaker isn't permanently stuck in half-open.
+        this.circuitBreaker.releaseProbe();
       }
 
       // Retry with exponential backoff for retryable errors — release slot, re-queue after delay
       if (request.retryCount < request.maxRetries && isRetryableError(err)) {
         request.retryCount++;
-        request.addedAt = Date.now(); // reset so queue-timeout doesn't expire this retry
         const backoffMs = calculateBackoff(
           request.retryCount,
           this.config.baseBackoffMs,
           this.config.maxBackoffMs,
         );
         setTimeout(() => {
+          request.addedAt = Date.now(); // stamp at re-queue time, not scheduling time
           this.insertByPriority(request);
           this.processQueue();
         }, backoffMs);
@@ -377,7 +416,11 @@ export class RequestQueue {
     // Throw an enriched error for non-2xx so retry logic can inspect status
     if (!response.ok) {
       // Drain body to free the connection — catch errors so they don't replace the HTTP error
-      try { await response.body?.cancel(); } catch { /* ignore stream errors */ }
+      try {
+        await response.body?.cancel();
+      } catch {
+        /* ignore stream errors */
+      }
       const err = new Error(`HTTP ${response.status}: ${response.statusText}`) as Error & {
         status: number;
         headers: Headers;
@@ -436,6 +479,7 @@ function isCircuitBreakerFault(error: Error & { status?: number }): boolean {
   return error.status >= 500 && error.status < 600;
 }
 
+/** Exponential backoff with jitter. `retryCount` must already be incremented (1-based). */
 function calculateBackoff(retryCount: number, baseMs: number, maxMs: number): number {
   const raw = baseMs * 2 ** (retryCount - 1);
   const jitter = raw * Math.random() * 0.25;
