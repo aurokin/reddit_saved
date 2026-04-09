@@ -1,0 +1,18 @@
+{
+  "name": "reddit-saved",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev:cli": "bun run --filter @reddit-saved/cli dev",
+    "dev:web": "bun run --filter @reddit-saved/web dev",
+    "build": "bun run --filter '*' build",
+    "test": "bun test",
+    "lint": "bunx biome check .",
+    "lint:fix": "bunx biome check --write .",
+    "typecheck": "bun run --filter '*' typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9",
+    "typescript": "^5.7"
+  }
+}
