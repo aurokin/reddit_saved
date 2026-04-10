@@ -1,9 +1,9 @@
 import {
-  REDDIT_OAUTH_AUTHORIZE_URL,
-  OAUTH_REDIRECT_URI,
-  OAUTH_SCOPES,
   OAUTH_DURATION,
+  OAUTH_REDIRECT_URI,
   OAUTH_RESPONSE_TYPE,
+  OAUTH_SCOPES,
+  REDDIT_OAUTH_AUTHORIZE_URL,
 } from "../constants";
 
 export interface AuthorizeUrlParams {

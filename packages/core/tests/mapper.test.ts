@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { mapRedditItemToRow } from "../src/storage/mapper";
 import type { RedditItem } from "../src/types";
 
@@ -56,7 +56,15 @@ describe("mapRedditItemToRow", () => {
       data: {
         ...baseItem.data,
         preview: {
-          images: [{ source: { url: "https://example.com/img.jpg?width=100&amp;height=200", width: 100, height: 200 } }],
+          images: [
+            {
+              source: {
+                url: "https://example.com/img.jpg?width=100&amp;height=200",
+                width: 100,
+                height: 200,
+              },
+            },
+          ],
         },
       },
     };
@@ -144,18 +152,60 @@ describe("mapRedditItemToRow", () => {
     expect(mapRedditItemToRow(item, "saved").edited).toBe(1);
   });
 
-  test("maps edited=false to null (not edited)", () => {
+  test("maps edited=false to 0 (not edited)", () => {
     const item: RedditItem = {
       ...baseItem,
       data: { ...baseItem.data, edited: false },
     };
-    expect(mapRedditItemToRow(item, "saved").edited).toBeNull();
+    expect(mapRedditItemToRow(item, "saved").edited).toBe(0);
   });
 
-  test("maps edited=undefined to null (field absent)", () => {
+  test("maps edited=undefined to 0 (field absent)", () => {
     // baseItem does not set edited, so it is undefined
     const row = mapRedditItemToRow(baseItem, "saved");
-    expect(row.edited).toBeNull();
+    expect(row.edited).toBe(0);
+  });
+
+  test("maps is_gallery: true to 1", () => {
+    const item: RedditItem = {
+      ...baseItem,
+      data: { ...baseItem.data, is_gallery: true },
+    };
+    const row = mapRedditItemToRow(item, "saved");
+    expect(row.is_gallery).toBe(1);
+  });
+
+  test("maps is_gallery undefined to 0", () => {
+    const row = mapRedditItemToRow(baseItem, "saved");
+    expect(row.is_gallery).toBe(0);
+  });
+
+  test("maps link_permalink for comments", () => {
+    const comment: RedditItem = {
+      kind: "t1",
+      data: {
+        id: "c2",
+        name: "t1_c2",
+        author: "user",
+        subreddit: "test",
+        permalink: "/r/test/comments/abc/post/c2/",
+        created_utc: 1700000000,
+        score: 3,
+        body: "nice",
+        link_permalink: "/r/test/comments/abc/original_post/",
+      },
+    };
+    const row = mapRedditItemToRow(comment, "saved");
+    expect(row.link_permalink).toBe("/r/test/comments/abc/original_post/");
+  });
+
+  test("preview with empty images array yields null preview_url", () => {
+    const item: RedditItem = {
+      ...baseItem,
+      data: { ...baseItem.data, preview: { images: [] } },
+    };
+    const row = mapRedditItemToRow(item, "saved");
+    expect(row.preview_url).toBeNull();
   });
 
   test("maps is_self=true to 1", () => {

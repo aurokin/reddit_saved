@@ -1,5 +1,5 @@
 import { OAUTH_STATE_EXPIRY_MS } from "../constants";
-import { generateState, generateCodeVerifier } from "./crypto";
+import { generateCodeVerifier, generateState } from "./crypto";
 
 export interface OAuthPendingState {
   state: string;

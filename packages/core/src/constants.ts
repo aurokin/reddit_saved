@@ -17,6 +17,8 @@ export const DEFAULT_OAUTH_HOST = "127.0.0.1";
  *  (e.g. from REDDIT_OAUTH_HOST env var), use startOAuthServer which builds the URI at call time. */
 export const OAUTH_REDIRECT_URI = `http://${DEFAULT_OAUTH_HOST}:${DEFAULT_REDIRECT_PORT}/callback`;
 export const OAUTH_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+/** Timeout for individual auth-related fetch calls (token exchange, refresh, /me) */
+export const AUTH_FETCH_TIMEOUT_MS = 30_000; // 30 seconds
 export const OAUTH_SCOPES = "identity history read save";
 export const OAUTH_DURATION = "permanent";
 export const OAUTH_RESPONSE_TYPE = "code";
@@ -163,8 +165,25 @@ export const DEFAULT_FILTER_SETTINGS: FilterSettings = {
   excludeNsfw: false,
 };
 
+Object.freeze(DEFAULT_FILTER_SETTINGS);
+Object.freeze(DEFAULT_FILTER_SETTINGS.subredditList);
+Object.freeze(DEFAULT_FILTER_SETTINGS.titleKeywords);
+Object.freeze(DEFAULT_FILTER_SETTINGS.contentKeywords);
+Object.freeze(DEFAULT_FILTER_SETTINGS.flairList);
+Object.freeze(DEFAULT_FILTER_SETTINGS.domainList);
+Object.freeze(DEFAULT_FILTER_SETTINGS.includePostTypes);
+Object.freeze(DEFAULT_FILTER_SETTINGS.authorList);
+
 // ============================================================================
 // Thumbnail Sentinel Values (skip these as thumbnail URLs)
 // ============================================================================
 
-export const THUMBNAIL_SENTINELS = new Set(["self", "default", "nsfw", "spoiler", "image", "video", ""]);
+export const THUMBNAIL_SENTINELS = new Set([
+  "self",
+  "default",
+  "nsfw",
+  "spoiler",
+  "image",
+  "video",
+  "",
+]);

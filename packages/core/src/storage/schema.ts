@@ -130,13 +130,13 @@ export function initializeSchema(db: Database): void {
   // Check schema version BEFORE the DDL transaction. If we threw inside the
   // transaction, the rollback would undo the schema_version table creation,
   // and the next startup would silently succeed — defeating the guard.
-  const hasVersionTable = db.query(
-    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'",
-  ).get();
+  const hasVersionTable = db
+    .query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'")
+    .get();
   if (hasVersionTable) {
-    const existing = db.query(
-      "SELECT version FROM schema_version ORDER BY version DESC LIMIT 1",
-    ).get() as { version: number } | null;
+    const existing = db
+      .query("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
+      .get() as { version: number } | null;
     if (existing && existing.version > SCHEMA_VERSION) {
       throw new Error(
         `Database schema (v${existing.version}) is newer than this code (v${SCHEMA_VERSION}). Update the application or use a compatible database.`,
@@ -158,9 +158,14 @@ export function initializeSchema(db: Database): void {
     }
 
     // Record schema version on first init
-    const existing = db.query("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1").get() as { version: number } | null;
+    const existing = db
+      .query("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
+      .get() as { version: number } | null;
     if (!existing) {
-      db.run("INSERT INTO schema_version (version, applied_at) VALUES (?, ?)", [SCHEMA_VERSION, Date.now()]);
+      db.run("INSERT INTO schema_version (version, applied_at) VALUES (?, ?)", [
+        SCHEMA_VERSION,
+        Date.now(),
+      ]);
     }
   })();
 }
@@ -174,8 +179,15 @@ export function assertFts5Available(db: Database): void {
     db.run("ROLLBACK TO SAVEPOINT fts5_probe");
     db.run("RELEASE SAVEPOINT fts5_probe");
   } catch {
-    try { db.run("ROLLBACK TO SAVEPOINT fts5_probe"); db.run("RELEASE SAVEPOINT fts5_probe"); } catch { /* cleanup */ }
-    throw new Error("SQLite FTS5 extension is not available. Bun's built-in SQLite should include it.");
+    try {
+      db.run("ROLLBACK TO SAVEPOINT fts5_probe");
+      db.run("RELEASE SAVEPOINT fts5_probe");
+    } catch {
+      /* cleanup */
+    }
+    throw new Error(
+      "SQLite FTS5 extension is not available. Bun's built-in SQLite should include it.",
+    );
   }
 }
 

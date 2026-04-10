@@ -1,7 +1,7 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync } from "fs";
-import { join, dirname } from "path";
-import { tmpdir } from "os";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { SqliteAdapter } from "../src/storage/sqlite-adapter";
 import { TagManager } from "../src/tags/tag-manager";
 import type { RedditItem } from "../src/types";
@@ -116,10 +116,10 @@ describe("TagManager", () => {
     tags.addTagToPost("rust", "p2");
 
     const list = tags.listTags();
-    const rust = list.find((t) => t.name === "rust")!;
-    const empty = list.find((t) => t.name === "empty")!;
-    expect(rust.count).toBe(2);
-    expect(empty.count).toBe(0);
+    const rust = list.find((t) => t.name === "rust");
+    const empty = list.find((t) => t.name === "empty");
+    expect(rust?.count).toBe(2);
+    expect(empty?.count).toBe(0);
   });
 
   test("tag names are case-insensitive", () => {
@@ -129,7 +129,7 @@ describe("TagManager", () => {
 
   test("removeTagFromPost throws when association doesn't exist", () => {
     tags.createTag("rust");
-    expect(() => tags.removeTagFromPost("rust", "p1")).toThrow('does not have tag');
+    expect(() => tags.removeTagFromPost("rust", "p1")).toThrow("does not have tag");
   });
 
   test("createTag returns the created tag directly", () => {
@@ -169,5 +169,57 @@ describe("TagManager", () => {
     tags.createTag("temp");
     tags.deleteTag("  temp  ");
     expect(tags.listTags().length).toBe(0);
+  });
+
+  // -----------------------------------------------------------------------
+  // New coverage: error paths and edge cases
+  // -----------------------------------------------------------------------
+
+  test("addTagToPost throws when tag does not exist", () => {
+    expect(() => tags.addTagToPost("nonexistent", "p1")).toThrow('Tag "nonexistent" not found');
+  });
+
+  test("addTagToPost throws when post does not exist", () => {
+    tags.createTag("rust");
+    expect(() => tags.addTagToPost("rust", "no_such_post")).toThrow('Item "no_such_post" not found');
+  });
+
+  test("removeTagFromPost throws when tag does not exist", () => {
+    expect(() => tags.removeTagFromPost("nonexistent", "p1")).toThrow(
+      'Tag "nonexistent" not found',
+    );
+  });
+
+  test("renameTag throws on duplicate name conflict", () => {
+    tags.createTag("alpha");
+    tags.createTag("beta");
+    expect(() => tags.renameTag("alpha", "beta")).toThrow('Tag "beta" already exists');
+  });
+
+  test("createTag throws for name exceeding 100 characters", () => {
+    expect(() => tags.createTag("a".repeat(101))).toThrow("cannot exceed 100");
+  });
+
+  test("getPostsByTag returns empty array for non-existent tag", () => {
+    const results = tags.getPostsByTag("nonexistent");
+    expect(results).toEqual([]);
+  });
+
+  test("getPostsByTag throws for invalid limit", () => {
+    tags.createTag("rust");
+    expect(() => tags.getPostsByTag("rust", 0)).toThrow("positive integer");
+    expect(() => tags.getPostsByTag("rust", -1)).toThrow("positive integer");
+    expect(() => tags.getPostsByTag("rust", 10_001)).toThrow("positive integer");
+    expect(() => tags.getPostsByTag("rust", 1.5)).toThrow("positive integer");
+  });
+
+  test("getPostsByTag respects limit", () => {
+    tags.createTag("rust");
+    tags.addTagToPost("rust", "p1");
+    tags.addTagToPost("rust", "p2");
+    tags.addTagToPost("rust", "p3");
+
+    const results = tags.getPostsByTag("rust", 2);
+    expect(results.length).toBe(2);
   });
 });

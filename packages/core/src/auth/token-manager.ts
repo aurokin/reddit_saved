@@ -1,16 +1,17 @@
-import { mkdirSync, writeFileSync, unlinkSync, readFileSync, renameSync } from "fs";
-import type { AuthSettings } from "../types";
+import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import {
-  REDDIT_OAUTH_TOKEN_URL,
-  REDDIT_OAUTH_BASE_URL,
-  OAUTH_REDIRECT_URI,
+  AUTH_FETCH_TIMEOUT_MS,
+  CONTENT_TYPE_FORM_URLENCODED,
   HEADER_AUTHORIZATION,
   HEADER_CONTENT_TYPE,
   HEADER_USER_AGENT,
-  CONTENT_TYPE_FORM_URLENCODED,
+  OAUTH_REDIRECT_URI,
+  REDDIT_OAUTH_BASE_URL,
+  REDDIT_OAUTH_TOKEN_URL,
   USER_AGENT_TEMPLATE,
   VERSION,
 } from "../constants";
+import type { AuthSettings } from "../types";
 import { paths } from "../utils/paths";
 
 /**
@@ -37,24 +38,31 @@ export class TokenManager {
 
     // Validate required fields before spreading into settings
     if (
-      typeof loaded.accessToken !== "string" || loaded.accessToken.length === 0 ||
-      typeof loaded.refreshToken !== "string" || loaded.refreshToken.length === 0 ||
-      typeof loaded.clientId !== "string" || loaded.clientId.length === 0 ||
-      typeof loaded.tokenExpiry !== "number" || !Number.isFinite(loaded.tokenExpiry) || loaded.tokenExpiry <= 0 ||
+      typeof loaded.accessToken !== "string" ||
+      loaded.accessToken.length === 0 ||
+      typeof loaded.refreshToken !== "string" ||
+      loaded.refreshToken.length === 0 ||
+      typeof loaded.clientId !== "string" ||
+      loaded.clientId.length === 0 ||
+      typeof loaded.tokenExpiry !== "number" ||
+      !Number.isFinite(loaded.tokenExpiry) ||
+      loaded.tokenExpiry <= 0 ||
       typeof loaded.username !== "string" // empty string is valid (fetchUsername may have failed during initial auth)
     ) {
       throw new Error(
         "auth.json is missing or has invalid required fields. " +
-        "Re-authenticate with 'reddit-saved auth login'.",
+          "Re-authenticate with 'reddit-saved auth login'.",
       );
     }
 
     const clientSecret = process.env.REDDIT_CLIENT_SECRET ?? loaded.clientSecret;
     if (!clientSecret) {
-      throw new Error(
-        "REDDIT_CLIENT_SECRET env var is not set and no secret was found in auth.json. " +
-        "Set the env var and retry, or re-authenticate with 'reddit-saved auth login'.",
-      );
+      const err = new Error(
+        "REDDIT_CLIENT_SECRET env var is not set. This is required for token refresh. " +
+          "Set the env var and retry, or re-authenticate with 'reddit-saved auth login'.",
+      ) as Error & { code: string };
+      err.code = "CLIENT_SECRET_MISSING";
+      throw err;
     }
     this.settings = { ...loaded, clientSecret } as AuthSettings;
     return this.settings;
@@ -94,7 +102,10 @@ export class TokenManager {
       ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
     });
 
-    const userAgent = USER_AGENT_TEMPLATE.replace("{version}", VERSION).replace("{username}", "unknown");
+    const userAgent = USER_AGENT_TEMPLATE.replace("{version}", VERSION).replace(
+      "{username}",
+      "unknown",
+    );
 
     const response = await fetch(REDDIT_OAUTH_TOKEN_URL, {
       method: "POST",
@@ -104,6 +115,7 @@ export class TokenManager {
         [HEADER_USER_AGENT]: userAgent,
       },
       body,
+      signal: AbortSignal.timeout(AUTH_FETCH_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -116,8 +128,15 @@ export class TokenManager {
       throw new Error(`Token exchange failed: ${json.error}`);
     }
 
-    if (typeof json.access_token !== "string" || typeof json.expires_in !== "number" || json.expires_in <= 0 || typeof json.refresh_token !== "string") {
-      throw new Error("Token exchange returned invalid response: missing access_token, refresh_token, or expires_in");
+    if (
+      typeof json.access_token !== "string" ||
+      typeof json.expires_in !== "number" ||
+      json.expires_in <= 0 ||
+      typeof json.refresh_token !== "string"
+    ) {
+      throw new Error(
+        "Token exchange returned invalid response: missing access_token, refresh_token, or expires_in",
+      );
     }
 
     this.settings = {
@@ -158,7 +177,7 @@ export class TokenManager {
       } catch (loadErr) {
         // Only swallow errors about missing clientSecret (expected when env var is unset).
         // Re-throw I/O errors, corruption, or validation failures — those indicate real problems.
-        if (loadErr instanceof Error && loadErr.message.includes("REDDIT_CLIENT_SECRET")) {
+        if (loadErr instanceof Error && (loadErr as Error & { code?: string }).code === "CLIENT_SECRET_MISSING") {
           // Fall through to use in-memory settings below.
         } else {
           throw loadErr;
@@ -169,7 +188,8 @@ export class TokenManager {
         // Restore in-memory clientSecret since disk never stores the secret.
         // load() guarantees freshSettings.clientSecret is non-empty, but guard defensively.
         const resolvedSecret = freshSettings.clientSecret || inMemorySecret;
-        if (!resolvedSecret) throw new Error("clientSecret unavailable. Set REDDIT_CLIENT_SECRET and retry.");
+        if (!resolvedSecret)
+          throw new Error("clientSecret unavailable. Set REDDIT_CLIENT_SECRET and retry.");
         this.settings = { ...freshSettings, clientSecret: resolvedSecret };
         return;
       }
@@ -178,10 +198,14 @@ export class TokenManager {
       // Preserve in-memory clientSecret if disk/env didn't have one.
       // Clone to avoid mutating this.settings through the alias when both point to the same object.
       const base = freshSettings ?? this.settings;
-      if (!base) throw new Error("Auth settings unavailable. Credentials may have been removed during refresh.");
-      const current = !base.clientSecret && inMemorySecret
-        ? { ...base, clientSecret: inMemorySecret }
-        : { ...base };
+      if (!base)
+        throw new Error(
+          "Auth settings unavailable. Credentials may have been removed during refresh.",
+        );
+      const current =
+        !base.clientSecret && inMemorySecret
+          ? { ...base, clientSecret: inMemorySecret }
+          : { ...base };
       const auth = btoa(`${current.clientId}:${current.clientSecret}`);
 
       const body = new URLSearchParams({
@@ -202,6 +226,7 @@ export class TokenManager {
           [HEADER_USER_AGENT]: userAgent,
         },
         body,
+        signal: AbortSignal.timeout(AUTH_FETCH_TIMEOUT_MS),
       });
 
       if (!response.ok) {
@@ -214,8 +239,14 @@ export class TokenManager {
         throw new Error(`Token refresh failed: ${json.error}`);
       }
 
-      if (typeof json.access_token !== "string" || typeof json.expires_in !== "number" || json.expires_in <= 0) {
-        throw new Error("Token refresh returned invalid response: missing access_token or expires_in");
+      if (
+        typeof json.access_token !== "string" ||
+        typeof json.expires_in !== "number" ||
+        json.expires_in <= 0
+      ) {
+        throw new Error(
+          "Token refresh returned invalid response: missing access_token or expires_in",
+        );
       }
 
       // Atomic pointer swap — prevents concurrent readers from seeing partially-updated state
@@ -244,7 +275,7 @@ export class TokenManager {
     if (!settings) throw new Error("Not authenticated. Run 'reddit-saved auth login' first.");
 
     // Refresh if token expires within 60 seconds
-    if (Date.now() >= (settings.tokenExpiry - 60_000)) {
+    if (Date.now() >= settings.tokenExpiry - 60_000) {
       this.refreshPromise ??= this.refreshAccessToken().finally(() => {
         this.refreshPromise = null;
       });
@@ -270,11 +301,17 @@ export class TokenManager {
    *  if the lock can't be acquired (user explicitly asked to log out). */
   async logout(): Promise<void> {
     const deleteAuthFile = () => {
-      try { unlinkSync(paths.authFile); } catch { /* Already removed */ }
+      try {
+        unlinkSync(paths.authFile);
+      } catch {
+        /* Already removed */
+      }
       this.settings = null;
     };
     try {
-      await this.withLock(async () => { deleteAuthFile(); });
+      await this.withLock(async () => {
+        deleteAuthFile();
+      });
     } catch {
       // Lock acquisition failed (e.g. hung process) — delete anyway as best effort
       deleteAuthFile();
@@ -285,6 +322,9 @@ export class TokenManager {
   // Private helpers
   // --------------------------------------------------------------------------
 
+  /** Fetch username via direct fetch (bypasses RequestQueue).
+   *  Used during initial auth when the queue isn't set up yet.
+   *  RedditApiClient.fetchUsername is the queue-backed equivalent for normal operation. */
   private async fetchUsername(): Promise<string> {
     const userAgent = USER_AGENT_TEMPLATE.replace("{version}", VERSION).replace(
       "{username}",
@@ -298,6 +338,7 @@ export class TokenManager {
         [HEADER_AUTHORIZATION]: `Bearer ${this.settings.accessToken}`,
         [HEADER_USER_AGENT]: userAgent,
       },
+      signal: AbortSignal.timeout(AUTH_FETCH_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -347,7 +388,11 @@ export class TokenManager {
           const holderPid = Number.parseInt(readFileSync(lockFile, "utf-8").trim(), 10);
           if (!Number.isInteger(holderPid) || holderPid <= 0) {
             // Corrupt lock file — remove unconditionally
-            try { unlinkSync(lockFile); } catch { /* already gone */ }
+            try {
+              unlinkSync(lockFile);
+            } catch {
+              /* already gone */
+            }
             await new Promise((r) => setTimeout(r, 50 + Math.random() * 100));
             continue;
           }
@@ -364,7 +409,9 @@ export class TokenManager {
                 if (currentPid === holderPid) {
                   unlinkSync(lockFile);
                 }
-              } catch { /* lock already gone or re-claimed — retry will sort it out */ }
+              } catch {
+                /* lock already gone or re-claimed — retry will sort it out */
+              }
               // Small delay after stale-lock cleanup to avoid tight spin if two
               // processes unlink simultaneously (see TOCTOU note above)
               await new Promise((r) => setTimeout(r, 50 + Math.random() * 100));
@@ -381,7 +428,9 @@ export class TokenManager {
     }
 
     if (!lockAcquired) {
-      throw new Error("Could not acquire auth lock after 10 seconds — another process may be refreshing tokens.");
+      throw new Error(
+        "Could not acquire auth lock after 10 seconds — another process may be refreshing tokens.",
+      );
     }
 
     try {

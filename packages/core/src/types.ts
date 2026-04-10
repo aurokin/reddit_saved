@@ -10,7 +10,13 @@ export type ContentOrigin = "saved" | "upvoted" | "submitted" | "commented";
 
 export type PostType = "text" | "link" | "image" | "video";
 export type FilterMode = "include" | "exclude";
-export type DateRangePreset = "all" | "last_day" | "last_week" | "last_month" | "last_year" | "custom";
+export type DateRangePreset =
+  | "all"
+  | "last_day"
+  | "last_week"
+  | "last_month"
+  | "last_year"
+  | "custom";
 
 export interface RedditItem {
   kind: string;
@@ -251,6 +257,13 @@ export interface FilterResult {
   filterType?: keyof FilterBreakdown;
 }
 
+export interface PreviewResult {
+  wouldImport: RedditItem[];
+  wouldFilter: Array<{ item: RedditItem; reason: string }>;
+  wouldSkip: RedditItem[];
+  breakdown: FilterBreakdown;
+}
+
 // ============================================================================
 // Request / Network Types (replaces Obsidian's RequestUrlParam/Response)
 // ============================================================================
@@ -277,7 +290,7 @@ export interface RequestResponse {
 
 export interface ApiClientCallbacks {
   onProgress?: (fetched: number, total: number | null) => void;
-  onRateLimit?: (waitMs: number, remaining: number) => void;
+  onRateLimit?: (resetMs: number, remaining: number) => void;
   onError?: (error: Error, retryable: boolean) => void;
   onPageFetched?: (pageNum: number, itemCount: number, cursor: string) => void;
 }
@@ -297,6 +310,14 @@ export interface FetchResult {
   cursor: string | null;
   hasMore: boolean;
   wasCancelled: boolean;
+  /** True when pagination stopped due to consecutive page fetch failures */
+  wasErrored?: boolean;
+}
+
+export interface UnsaveResult {
+  succeeded: string[];
+  failed: Array<{ id: string; error: Error }>;
+  wasCancelled: boolean;
 }
 
 // ============================================================================
@@ -310,6 +331,55 @@ export interface AuthSettings {
   username: string;
   clientId: string;
   clientSecret: string;
+}
+
+// ============================================================================
+// Performance Monitor Types
+// ============================================================================
+
+export interface RequestMetrics {
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  rateLimitedRequests: number;
+  totalBytesDownloaded: number;
+  avgResponseTimeMs: number;
+  minResponseTimeMs: number;
+  maxResponseTimeMs: number;
+  rateLimitWaitTimeMs: number;
+  requestTimestamps: number[];
+}
+
+export interface SyncMetrics {
+  startTime: number;
+  endTime?: number;
+  itemsFetched: number;
+  itemsProcessed: number;
+  itemsStored: number;
+  itemsSkipped: number;
+  itemsFailed: number;
+  memoryUsageSamples: MemorySample[];
+}
+
+export interface MemorySample {
+  timestamp: number;
+  rssBytes: number;
+}
+
+export interface PerformanceSummary {
+  durationMs: number;
+  itemsPerSecond: number;
+  avgRequestLatencyMs: number;
+  requestSuccessRate: number;
+  rateLimitPercentage: number;
+  effectiveThroughput: number;
+}
+
+export interface Bottleneck {
+  type: "network" | "rate_limit" | "processing";
+  severity: "low" | "medium" | "high";
+  description: string;
+  recommendation: string;
 }
 
 // ============================================================================
@@ -375,7 +445,8 @@ export interface ListOptions {
   author?: string;
   minScore?: number;
   tag?: string;
-  orphaned?: boolean;
+  /** true = orphaned only, false/undefined = active only, "all" = both */
+  orphaned?: boolean | "all";
   kind?: "t1" | "t3";
   contentOrigin?: ContentOrigin;
   sort?: "created" | "score";
@@ -389,7 +460,8 @@ export interface SearchOptions {
   author?: string;
   minScore?: number;
   tag?: string;
-  orphaned?: boolean;
+  /** true = orphaned only, false/undefined = active only, "all" = both */
+  orphaned?: boolean | "all";
   kind?: "t1" | "t3";
   limit?: number;
   offset?: number;

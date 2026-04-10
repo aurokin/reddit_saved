@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type { Tag, TagWithCount, PostRow } from "../types";
+import type { PostRow, Tag, TagWithCount } from "../types";
 
 /**
  * CRUD for tags and post-tag associations.
@@ -32,7 +32,10 @@ export class TagManager {
     if (trimmedNew.length === 0) throw new Error("Tag name cannot be empty");
     if (trimmedNew.length > 100) throw new Error("Tag name cannot exceed 100 characters");
     try {
-      const result = this.db.run("UPDATE tags SET name = ? WHERE name = ?", [trimmedNew, trimmedOld]);
+      const result = this.db.run("UPDATE tags SET name = ? WHERE name = ?", [
+        trimmedNew,
+        trimmedOld,
+      ]);
       if (result.changes === 0) {
         throw new Error(`Tag "${trimmedOld}" not found`);
       }
@@ -56,28 +59,36 @@ export class TagManager {
   addTagToPost(tagName: string, postId: string): void {
     const trimmed = tagName.trim();
     this.db.transaction(() => {
-      const tag = this.db.query("SELECT id FROM tags WHERE name = ?").get(trimmed) as { id: number } | null;
+      const tag = this.db.query("SELECT id FROM tags WHERE name = ?").get(trimmed) as {
+        id: number;
+      } | null;
       if (!tag) throw new Error(`Tag "${trimmed}" not found`);
 
-      const item = this.db.query("SELECT id FROM posts WHERE id = ?").get(postId) as { id: string } | null;
+      const item = this.db.query("SELECT id FROM posts WHERE id = ?").get(postId) as {
+        id: string;
+      } | null;
       if (!item) throw new Error(`Item "${postId}" not found`);
 
       // INSERT OR IGNORE — no-op if already tagged
-      this.db.run("INSERT OR IGNORE INTO post_tags (post_id, tag_id, created_at) VALUES (?, ?, ?)", [
-        postId,
-        tag.id,
-        Date.now(),
-      ]);
+      this.db.run(
+        "INSERT OR IGNORE INTO post_tags (post_id, tag_id, created_at) VALUES (?, ?, ?)",
+        [postId, tag.id, Date.now()],
+      );
     })();
   }
 
   removeTagFromPost(tagName: string, postId: string): void {
     const trimmed = tagName.trim();
     this.db.transaction(() => {
-      const tag = this.db.query("SELECT id FROM tags WHERE name = ?").get(trimmed) as { id: number } | null;
+      const tag = this.db.query("SELECT id FROM tags WHERE name = ?").get(trimmed) as {
+        id: number;
+      } | null;
       if (!tag) throw new Error(`Tag "${trimmed}" not found`);
 
-      const result = this.db.run("DELETE FROM post_tags WHERE post_id = ? AND tag_id = ?", [postId, tag.id]);
+      const result = this.db.run("DELETE FROM post_tags WHERE post_id = ? AND tag_id = ?", [
+        postId,
+        tag.id,
+      ]);
       if (result.changes === 0) {
         throw new Error(`Item "${postId}" does not have tag "${trimmed}"`);
       }
@@ -98,7 +109,8 @@ export class TagManager {
   /** Get active (non-orphaned) posts with the given tag.
    * For orphaned tagged posts, use SqliteAdapter.listPosts({ tag, orphaned: true }). */
   getPostsByTag(tagName: string, limit = 1000): PostRow[] {
-    if (!Number.isInteger(limit) || limit <= 0 || limit > 10_000) throw new Error("limit must be a positive integer (max 10000)");
+    if (!Number.isInteger(limit) || limit <= 0 || limit > 10_000)
+      throw new Error("limit must be a positive integer (max 10000)");
     const trimmed = tagName.trim();
     return this.db
       .query(

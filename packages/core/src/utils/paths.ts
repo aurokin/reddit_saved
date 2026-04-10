@@ -1,5 +1,5 @@
-import { homedir, platform } from "os";
-import { join } from "path";
+import { homedir, platform } from "node:os";
+import { join } from "node:path";
 
 const APP_NAME = "reddit-saved";
 

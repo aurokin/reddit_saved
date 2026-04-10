@@ -1,24 +1,24 @@
 import { Database, type SQLQueryBindings } from "bun:sqlite";
-import { mkdirSync } from "fs";
-import { dirname } from "path";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import type {
-  StorageAdapter,
-  RedditItem,
   ContentOrigin,
-  PostRow,
+  DbStats,
   ListOptions,
+  PostRow,
+  RedditItem,
   SearchOptions,
   SearchResult,
-  DbStats,
+  StorageAdapter,
 } from "../types";
 import { paths } from "../utils/paths";
 import { mapRedditItemToRow } from "./mapper";
 import {
-  initializeSchema,
   assertFts5Available as assertFts5,
-  rebuildFtsIndex as rebuildFts,
-  dropFtsTriggers,
   createFtsTriggers,
+  dropFtsTriggers,
+  initializeSchema,
+  rebuildFtsIndex as rebuildFts,
 } from "./schema";
 
 type BindValue = string | number | bigint | boolean | null;
@@ -26,7 +26,8 @@ type BindRecord = Record<string, BindValue>;
 
 /** Subquery for tag filtering — used in both listPosts and searchPosts.
  *  Uses EXISTS with explicit post_id reference to avoid coupling to the outer query alias. */
-const TAG_FILTER_SQL = "EXISTS (SELECT 1 FROM post_tags pt2 JOIN tags t2 ON t2.id = pt2.tag_id WHERE pt2.post_id = p.id AND t2.name = ?)";
+const TAG_FILTER_SQL =
+  "EXISTS (SELECT 1 FROM post_tags pt2 JOIN tags t2 ON t2.id = pt2.tag_id WHERE pt2.post_id = p.id AND t2.name = ?)";
 
 export class SqliteAdapter implements StorageAdapter {
   private db: Database;
@@ -133,9 +134,9 @@ export class SqliteAdapter implements StorageAdapter {
     const where: string[] = [];
     const params: BindValue[] = [];
 
-    if (opts.orphaned) {
+    if (opts.orphaned === true) {
       where.push("p.is_on_reddit = 0");
-    } else {
+    } else if (opts.orphaned !== "all") {
       where.push("p.is_on_reddit = 1");
     }
 
@@ -189,16 +190,19 @@ export class SqliteAdapter implements StorageAdapter {
     // Sanitize for FTS5: keep only letters, digits, and whitespace, then wrap
     // as a double-quoted phrase literal. This prevents any FTS5 operator or
     // structural character (", *, ^, parentheses, OR/AND/NOT, etc.) from leaking.
-    const cleaned = query.replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+    const cleaned = query
+      .replace(/[^\p{L}\p{N}\s\-']/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     if (!cleaned) return [];
     const safeQuery = `"${cleaned}"`;
 
     const where: string[] = ["posts_fts MATCH ?"];
     const params: BindValue[] = [safeQuery];
 
-    if (opts.orphaned) {
+    if (opts.orphaned === true) {
       where.push("p.is_on_reddit = 0");
-    } else {
+    } else if (opts.orphaned !== "all") {
       where.push("p.is_on_reddit = 1");
     }
     if (opts.subreddit) {
@@ -258,14 +262,21 @@ export class SqliteAdapter implements StorageAdapter {
   }
 
   markOrphaned(olderThan: number, origin?: ContentOrigin): number {
+    if (olderThan < 1_000_000_000_000) {
+      throw new Error("markOrphaned expects epoch milliseconds (Date.now()), not seconds");
+    }
     if (origin) {
       const rows = this.db
-        .query("UPDATE posts SET is_on_reddit = 0 WHERE is_on_reddit = 1 AND last_seen_at < ? AND content_origin = ? RETURNING id")
+        .query(
+          "UPDATE posts SET is_on_reddit = 0 WHERE is_on_reddit = 1 AND last_seen_at < ? AND content_origin = ? RETURNING id",
+        )
         .all(olderThan, origin) as Array<{ id: string }>;
       return rows.length;
     }
     const rows = this.db
-      .query("UPDATE posts SET is_on_reddit = 0 WHERE is_on_reddit = 1 AND last_seen_at < ? RETURNING id")
+      .query(
+        "UPDATE posts SET is_on_reddit = 0 WHERE is_on_reddit = 1 AND last_seen_at < ? RETURNING id",
+      )
       .all(olderThan) as Array<{ id: string }>;
     return rows.length;
   }
@@ -292,7 +303,10 @@ export class SqliteAdapter implements StorageAdapter {
       .all() as Array<{ content_origin: string; count: number }>;
 
     const activeCountByOrigin: Record<ContentOrigin, number> = {
-      saved: 0, upvoted: 0, submitted: 0, commented: 0,
+      saved: 0,
+      upvoted: 0,
+      submitted: 0,
+      commented: 0,
     };
     for (const row of originRows) {
       if (row.content_origin in activeCountByOrigin) {
@@ -338,9 +352,9 @@ export class SqliteAdapter implements StorageAdapter {
   // --------------------------------------------------------------------------
 
   getSyncState(key: string): string | null {
-    const row = this.db
-      .query("SELECT value FROM sync_state WHERE key = ?")
-      .get(key) as { value: string } | null;
+    const row = this.db.query("SELECT value FROM sync_state WHERE key = ?").get(key) as {
+      value: string;
+    } | null;
     return row?.value ?? null;
   }
 
@@ -364,9 +378,9 @@ export class SqliteAdapter implements StorageAdapter {
       for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
         const chunk = ids.slice(i, i + CHUNK_SIZE);
         const placeholders = chunk.map(() => "?").join(",");
-        this.db.query(
-          `UPDATE posts SET is_on_reddit = 0 WHERE id IN (${placeholders})`,
-        ).run(...(chunk as SQLQueryBindings[]));
+        this.db
+          .query(`UPDATE posts SET is_on_reddit = 0 WHERE id IN (${placeholders})`)
+          .run(...(chunk as SQLQueryBindings[]));
       }
     })();
   }
@@ -394,9 +408,13 @@ export class SqliteAdapter implements StorageAdapter {
   /** Ensure FTS triggers exist and index is consistent.
    * Checks trigger presence first, then runs FTS5 integrity-check to catch stale indexes. */
   private ensureFtsConsistency(): void {
-    const triggerCount = (this.db
-      .query("SELECT COUNT(*) AS cnt FROM sqlite_master WHERE type = 'trigger' AND name IN ('posts_ai', 'posts_ad', 'posts_au')")
-      .get() as { cnt: number }).cnt;
+    const triggerCount = (
+      this.db
+        .query(
+          "SELECT COUNT(*) AS cnt FROM sqlite_master WHERE type = 'trigger' AND name IN ('posts_ai', 'posts_ad', 'posts_au')",
+        )
+        .get() as { cnt: number }
+    ).cnt;
 
     let needsRebuild = triggerCount < 3;
     if (!needsRebuild) {

@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { SyncStateManager } from "../src/sync/state-manager";
 
 function makeTempDir(): string {
@@ -187,5 +187,513 @@ describe("SyncStateManager", () => {
   test("clear is a no-op when file does not exist", async () => {
     // Should not throw
     await manager.clear();
+  });
+
+  test("clear propagates non-ENOENT errors", async () => {
+    // Save a checkpoint so the file exists
+    const cp = manager.createNew("test");
+    await manager.save(cp);
+
+    // Make the parent directory read-only to trigger EACCES on unlink
+    const dir = dirname(checkpointPath);
+    chmodSync(dir, 0o444);
+
+    try {
+      await expect(manager.clear()).rejects.toThrow();
+    } finally {
+      // Restore permissions for cleanup
+      chmodSync(dir, 0o755);
+    }
+  });
+
+  test("load cleans up orphaned .tmp file", async () => {
+    const tmpPath = `${checkpointPath}.tmp`;
+    writeFileSync(tmpPath, "orphaned temp data");
+
+    // load() should delete the .tmp file as part of its cleanup
+    const loaded = await manager.load();
+    expect(loaded).toBeNull(); // no checkpoint file exists
+
+    // Verify .tmp was cleaned up
+    expect(await Bun.file(tmpPath).exists()).toBe(false);
+  });
+
+  test("load succeeds when no .tmp file exists", async () => {
+    const cp = manager.createNew("test-session");
+    await manager.save(cp);
+    const loaded = await manager.load();
+    expect(loaded).not.toBeNull();
+    expect(loaded?.sessionId).toBe("test-session");
+  });
+
+  test("load normalizes populated fetchedIds/failedIds from external checkpoint", async () => {
+    const now = Date.now();
+    writeFileSync(
+      checkpointPath,
+      JSON.stringify({
+        sessionId: "external",
+        phase: "fetching",
+        cursor: null,
+        totalFetched: 5,
+        fetchedIds: ["a", "b", "c"],
+        failedIds: ["d"],
+        startedAt: now,
+        updatedAt: now,
+      }),
+    );
+    const loaded = await manager.load();
+    expect(loaded).not.toBeNull();
+    expect(loaded?.sessionId).toBe("external");
+    // Arrays should be normalized to empty regardless of what was on disk
+    expect(loaded?.fetchedIds).toEqual([]);
+    expect(loaded?.failedIds).toEqual([]);
+  });
+
+  test("concurrent save() calls serialize correctly", async () => {
+    const cp1 = manager.createNew("session-1");
+    cp1.totalFetched = 10;
+    const cp2 = manager.createNew("session-2");
+    cp2.totalFetched = 20;
+    const cp3 = manager.createNew("session-3");
+    cp3.totalFetched = 30;
+
+    // Fire all three saves concurrently
+    await Promise.all([manager.save(cp1), manager.save(cp2), manager.save(cp3)]);
+
+    const loaded = await manager.load();
+    expect(loaded).not.toBeNull();
+    // Last writer wins — session-3 was queued last
+    expect(loaded?.sessionId).toBe("session-3");
+    expect(loaded?.totalFetched).toBe(30);
+  });
+
+  // -----------------------------------------------------------------------
+  // New coverage: validation edge cases
+  // -----------------------------------------------------------------------
+
+  test("load rejects startedAt: 0", async () => {
+    const now = Date.now();
+    writeFileSync(
+      checkpointPath,
+      JSON.stringify({
+        sessionId: "ok",
+        phase: "fetching",
+        cursor: null,
+        totalFetched: 0,
+        fetchedIds: [],
+        failedIds: [],
+        startedAt: 0,
+        updatedAt: now,
+      }),
+    );
+    const loaded = await manager.load();
+    expect(loaded).toBeNull();
+    expect(await Bun.file(checkpointPath).exists()).toBe(false);
+  });
+
+  test("load rejects updatedAt: 0", async () => {
+    const now = Date.now();
+    writeFileSync(
+      checkpointPath,
+      JSON.stringify({
+        sessionId: "ok",
+        phase: "fetching",
+        cursor: null,
+        totalFetched: 0,
+        fetchedIds: [],
+        failedIds: [],
+        startedAt: now,
+        updatedAt: 0,
+      }),
+    );
+    const loaded = await manager.load();
+    expect(loaded).toBeNull();
+    expect(await Bun.file(checkpointPath).exists()).toBe(false);
+  });
+
+  test("load rejects non-integer updatedAt", async () => {
+    const now = Date.now();
+    writeFileSync(
+      checkpointPath,
+      JSON.stringify({
+        sessionId: "ok",
+        phase: "fetching",
+        cursor: null,
+        totalFetched: 0,
+        fetchedIds: [],
+        failedIds: [],
+        startedAt: now,
+        updatedAt: 1.5,
+      }),
+    );
+    const loaded = await manager.load();
+    expect(loaded).toBeNull();
+    expect(await Bun.file(checkpointPath).exists()).toBe(false);
+  });
+
+  test("load rejects non-array fetchedIds", async () => {
+    const now = Date.now();
+    writeFileSync(
+      checkpointPath,
+      JSON.stringify({
+        sessionId: "ok",
+        phase: "fetching",
+        cursor: null,
+        totalFetched: 0,
+        fetchedIds: "not-array",
+        failedIds: [],
+        startedAt: now,
+        updatedAt: now,
+      }),
+    );
+    const loaded = await manager.load();
+    expect(loaded).toBeNull();
+    expect(await Bun.file(checkpointPath).exists()).toBe(false);
+  });
+
+  test("load rejects cursor exceeding 200 characters", async () => {
+    const now = Date.now();
+    writeFileSync(
+      checkpointPath,
+      JSON.stringify({
+        sessionId: "ok",
+        phase: "fetching",
+        cursor: "x".repeat(201),
+        totalFetched: 0,
+        fetchedIds: [],
+        failedIds: [],
+        startedAt: now,
+        updatedAt: now,
+      }),
+    );
+    const loaded = await manager.load();
+    expect(loaded).toBeNull();
+  });
+
+  test("load accepts cursor at exactly 200 characters", async () => {
+    const now = Date.now();
+    writeFileSync(
+      checkpointPath,
+      JSON.stringify({
+        sessionId: "ok",
+        phase: "fetching",
+        cursor: "x".repeat(200),
+        totalFetched: 0,
+        fetchedIds: [],
+        failedIds: [],
+        startedAt: now,
+        updatedAt: now,
+      }),
+    );
+    const loaded = await manager.load();
+    expect(loaded).not.toBeNull();
+  });
+
+  test("load rejects fetchedIds exceeding 10000 entries", async () => {
+    const now = Date.now();
+    writeFileSync(
+      checkpointPath,
+      JSON.stringify({
+        sessionId: "ok",
+        phase: "fetching",
+        cursor: null,
+        totalFetched: 0,
+        fetchedIds: Array.from({ length: 10001 }, (_, i) => `id${i}`),
+        failedIds: [],
+        startedAt: now,
+        updatedAt: now,
+      }),
+    );
+    const loaded = await manager.load();
+    expect(loaded).toBeNull();
+  });
+
+  test("load rejects fetchedIds containing strings over 20 chars", async () => {
+    const now = Date.now();
+    writeFileSync(
+      checkpointPath,
+      JSON.stringify({
+        sessionId: "ok",
+        phase: "fetching",
+        cursor: null,
+        totalFetched: 0,
+        fetchedIds: ["a".repeat(21)],
+        failedIds: [],
+        startedAt: now,
+        updatedAt: now,
+      }),
+    );
+    const loaded = await manager.load();
+    expect(loaded).toBeNull();
+  });
+
+  test("load rejects invalid phase values", async () => {
+    const now = Date.now();
+    writeFileSync(
+      checkpointPath,
+      JSON.stringify({
+        sessionId: "ok",
+        phase: "invalid_phase",
+        cursor: null,
+        totalFetched: 0,
+        fetchedIds: [],
+        failedIds: [],
+        startedAt: now,
+        updatedAt: now,
+      }),
+    );
+    const loaded = await manager.load();
+    expect(loaded).toBeNull();
+  });
+
+  test("cursor: null round-trips correctly", async () => {
+    const cp = manager.createNew();
+    expect(cp.cursor).toBeNull();
+
+    await manager.save(cp);
+    const loaded = await manager.load();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.cursor).toBeNull();
+  });
+
+  test("load rejects failedIds exceeding 10000 entries", async () => {
+    const now = Date.now();
+    writeFileSync(
+      checkpointPath,
+      JSON.stringify({
+        sessionId: "ok",
+        phase: "fetching",
+        cursor: null,
+        totalFetched: 0,
+        fetchedIds: [],
+        failedIds: Array.from({ length: 10001 }, (_, i) => `id${i}`),
+        startedAt: now,
+        updatedAt: now,
+      }),
+    );
+    const loaded = await manager.load();
+    expect(loaded).toBeNull();
+    expect(await Bun.file(checkpointPath).exists()).toBe(false);
+  });
+
+  test("load rejects failedIds containing strings over 20 chars", async () => {
+    const now = Date.now();
+    writeFileSync(
+      checkpointPath,
+      JSON.stringify({
+        sessionId: "ok",
+        phase: "fetching",
+        cursor: null,
+        totalFetched: 0,
+        fetchedIds: [],
+        failedIds: ["a".repeat(21)],
+        startedAt: now,
+        updatedAt: now,
+      }),
+    );
+    const loaded = await manager.load();
+    expect(loaded).toBeNull();
+    expect(await Bun.file(checkpointPath).exists()).toBe(false);
+  });
+
+  test("load rejects non-integer totalFetched (float)", async () => {
+    const now = Date.now();
+    writeFileSync(
+      checkpointPath,
+      JSON.stringify({
+        sessionId: "ok",
+        phase: "fetching",
+        cursor: null,
+        totalFetched: 1.5,
+        fetchedIds: [],
+        failedIds: [],
+        startedAt: now,
+        updatedAt: now,
+      }),
+    );
+    const loaded = await manager.load();
+    expect(loaded).toBeNull();
+    expect(await Bun.file(checkpointPath).exists()).toBe(false);
+  });
+
+  test("save fails for read-only directory", async () => {
+    const { chmodSync } = await import("node:fs");
+    const readonlyDir = makeTempDir();
+    const readonlyPath = join(readonlyDir, "subdir", "checkpoint.json");
+    // Create the subdir then make it read-only
+    const { mkdirSync } = await import("node:fs");
+    mkdirSync(join(readonlyDir, "subdir"), { recursive: true });
+    chmodSync(join(readonlyDir, "subdir"), 0o444);
+
+    const readonlyManager = new SyncStateManager(readonlyPath);
+    const cp = readonlyManager.createNew();
+
+    try {
+      await expect(readonlyManager.save(cp)).rejects.toThrow();
+    } finally {
+      // Restore permissions for cleanup
+      chmodSync(join(readonlyDir, "subdir"), 0o755);
+      rmSync(readonlyDir, { recursive: true, force: true });
+    }
+  });
+
+  test("concurrent save calls are serialized — second save's data wins", async () => {
+    const cp1 = manager.createNew("session-1");
+    cp1.cursor = "cursor-1";
+    cp1.totalFetched = 10;
+
+    const cp2 = manager.createNew("session-2");
+    cp2.cursor = "cursor-2";
+    cp2.totalFetched = 20;
+
+    // Fire both saves concurrently
+    await Promise.all([manager.save(cp1), manager.save(cp2)]);
+
+    const loaded = await manager.load();
+    expect(loaded).not.toBeNull();
+    // Second save should win since saves are serialized
+    expect(loaded!.sessionId).toBe("session-2");
+    expect(loaded!.cursor).toBe("cursor-2");
+    expect(loaded!.totalFetched).toBe(20);
+  });
+
+  test("multiple rapid saves all complete without data corruption", async () => {
+    // Fire 5 rapid saves — only the last one's data should persist
+    const saves: Promise<void>[] = [];
+    for (let i = 0; i < 5; i++) {
+      const cp = manager.createNew(`session-${i}`);
+      cp.cursor = `cursor-${i}`;
+      cp.totalFetched = i * 10;
+      saves.push(manager.save(cp));
+    }
+    await Promise.all(saves);
+
+    const loaded = await manager.load();
+    expect(loaded).not.toBeNull();
+    // Last save should win
+    expect(loaded!.sessionId).toBe("session-4");
+    expect(loaded!.cursor).toBe("cursor-4");
+    expect(loaded!.totalFetched).toBe(40);
+  });
+
+  test("onSaveError callback fires when a subsequent save follows a failed one", async () => {
+    const saveErrors: unknown[] = [];
+    const tempDir = makeTempDir();
+    const cpPath = join(tempDir, "subdir", "checkpoint.json");
+    const errorManager = new SyncStateManager(cpPath, (err) => saveErrors.push(err));
+
+    const cp1 = errorManager.createNew("session-ok");
+    // First save succeeds (directory was created by constructor)
+    await errorManager.save(cp1);
+
+    // Make the directory read-only so the next save will fail
+    chmodSync(dirname(cpPath), 0o444);
+
+    const cp2 = errorManager.createNew("session-fail");
+    try {
+      await errorManager.save(cp2);
+    } catch {
+      // Expected: this save fails due to read-only directory
+    }
+
+    // onSaveError hasn't fired yet — it fires when the *next* save starts
+    expect(saveErrors.length).toBe(0);
+
+    // Restore permissions so the recovery save can succeed
+    chmodSync(dirname(cpPath), 0o755);
+
+    // This save triggers onSaveError for the previous failure before proceeding
+    const cp3 = errorManager.createNew("session-recover");
+    await errorManager.save(cp3);
+
+    expect(saveErrors.length).toBe(1);
+
+    const loaded = await errorManager.load();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.sessionId).toBe("session-recover");
+
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test("onSaveError is optional — saves work without it", async () => {
+    const noCallbackManager = new SyncStateManager(join(makeTempDir(), "cp.json"));
+    const cp = noCallbackManager.createNew("session-no-cb");
+    await noCallbackManager.save(cp);
+    const loaded = await noCallbackManager.load();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.sessionId).toBe("session-no-cb");
+  });
+
+  test("console.warn fires when save fails without onSaveError callback", async () => {
+    const tempDir = makeTempDir();
+    const cpPath = join(tempDir, "subdir", "checkpoint.json");
+    const noCallbackManager = new SyncStateManager(cpPath);
+
+    const cp1 = noCallbackManager.createNew("session-ok");
+    await noCallbackManager.save(cp1);
+
+    // Make directory read-only so next save fails
+    chmodSync(dirname(cpPath), 0o444);
+
+    const cp2 = noCallbackManager.createNew("session-fail");
+    try {
+      await noCallbackManager.save(cp2);
+    } catch {
+      // Expected failure
+    }
+
+    // Restore permissions and spy on console.warn
+    chmodSync(dirname(cpPath), 0o755);
+    const warnSpy = mock(() => {});
+    const origWarn = console.warn;
+    console.warn = warnSpy as unknown as typeof console.warn;
+
+    try {
+      // This save triggers the warn for the previous failure
+      const cp3 = noCallbackManager.createNew("session-recover");
+      await noCallbackManager.save(cp3);
+      expect(warnSpy).toHaveBeenCalled();
+      expect(warnSpy.mock.calls[0]?.[0]).toContain("SyncStateManager");
+    } finally {
+      console.warn = origWarn;
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("onSaveError callback prevents console.warn", async () => {
+    const saveErrors: unknown[] = [];
+    const tempDir = makeTempDir();
+    const cpPath = join(tempDir, "subdir", "checkpoint.json");
+    const errorManager = new SyncStateManager(cpPath, (err) => saveErrors.push(err));
+
+    const cp1 = errorManager.createNew("session-ok");
+    await errorManager.save(cp1);
+
+    // Make directory read-only so next save fails
+    chmodSync(dirname(cpPath), 0o444);
+
+    const cp2 = errorManager.createNew("session-fail");
+    try {
+      await errorManager.save(cp2);
+    } catch {
+      // Expected failure
+    }
+
+    // Restore permissions and spy on console.warn
+    chmodSync(dirname(cpPath), 0o755);
+    const warnSpy = mock(() => {});
+    const origWarn = console.warn;
+    console.warn = warnSpy as unknown as typeof console.warn;
+
+    try {
+      const cp3 = errorManager.createNew("session-recover");
+      await errorManager.save(cp3);
+      // onSaveError should receive the error, not console.warn
+      expect(saveErrors.length).toBe(1);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      console.warn = origWarn;
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

@@ -1,9 +1,9 @@
 import { DEFAULT_REDIRECT_PORT, OAUTH_TIMEOUT_MS } from "../constants";
-import { TokenManager } from "./token-manager";
-import { buildAuthorizeUrl } from "./oauth-urls";
-import { createPendingState, validateState, type OAuthPendingState } from "./oauth-state";
-import { deriveCodeChallenge } from "./crypto";
 import { escapeHtml } from "../utils/html-escape";
+import { deriveCodeChallenge } from "./crypto";
+import { type OAuthPendingState, createPendingState, validateState } from "./oauth-state";
+import { buildAuthorizeUrl } from "./oauth-urls";
+import { TokenManager } from "./token-manager";
 
 export interface OAuthServerOptions {
   clientId: string;
@@ -67,7 +67,9 @@ export async function startOAuthServer(options: OAuthServerOptions): Promise<OAu
       throw new Error(`returnTo must use http or https, got: ${returnUrl.protocol}`);
     }
     if (!allowedHosts.has(returnUrl.hostname)) {
-      throw new Error(`returnTo hostname "${returnUrl.hostname}" is not in the allowed set: ${[...allowedHosts].join(", ")}`);
+      throw new Error(
+        `returnTo hostname "${returnUrl.hostname}" is not in the allowed set: ${[...allowedHosts].join(", ")}`,
+      );
     }
   }
 
@@ -117,10 +119,15 @@ export async function startOAuthServer(options: OAuthServerOptions): Promise<OAu
 
       // Guard against duplicate /callback hits (browser retry, double-click)
       if (settled) {
-        return new Response(errorPage("Authorization already handled. Please close this tab and try again if needed."), {
-          status: 400,
-          headers: { "Content-Type": "text/html" },
-        });
+        return new Response(
+          errorPage(
+            "Authorization already handled. Please close this tab and try again if needed.",
+          ),
+          {
+            status: 400,
+            headers: { "Content-Type": "text/html" },
+          },
+        );
       }
 
       const code = url.searchParams.get("code");

@@ -1,5 +1,5 @@
-import type { RequestParams } from "../types";
 import { OFFLINE_QUEUE_MAX_SIZE } from "../constants";
+import type { RequestParams } from "../types";
 
 export type RequestPriority = "high" | "normal" | "low";
 

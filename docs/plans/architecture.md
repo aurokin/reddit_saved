@@ -294,7 +294,7 @@ this.userAgent = USER_AGENT_TEMPLATE
 
 ```typescript
 class RedditApiClient {
-  constructor(settings: AuthSettings, callbacks?: ApiClientCallbacks);
+  constructor(tokenProvider: TokenProvider, requestQueue: RequestQueue, callbacks?: ApiClientCallbacks, baseUrl?: string);
 
   // Fetch endpoints — return RedditItem[]
   fetchSaved(opts?: FetchOptions): Promise<FetchResult>;

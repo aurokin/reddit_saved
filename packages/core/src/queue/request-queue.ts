@@ -20,6 +20,10 @@ export interface RequestQueueConfig {
   /** Per-attempt HTTP timeout in ms. Note: retries reset the budget, so this
    *  bounds each individual HTTP attempt, not total wall-clock time. */
   defaultTimeoutMs: number;
+  /** Maximum total wall-clock time a request may reside in the queue (including
+   *  retries). Requests exceeding this are rejected before consuming resources.
+   *  Default: 5 minutes. */
+  maxQueueTimeMs: number;
   maxRetries: number;
   baseBackoffMs: number;
   maxBackoffMs: number;
@@ -31,6 +35,7 @@ export interface RequestQueueConfig {
 const DEFAULT_CONFIG: RequestQueueConfig = {
   maxConcurrent: 2,
   defaultTimeoutMs: 30_000,
+  maxQueueTimeMs: 300_000,
   maxRetries: MAX_REQUEST_RETRIES,
   baseBackoffMs: 1000,
   maxBackoffMs: BACKOFF_MAX_DELAY_MS,
@@ -56,6 +61,11 @@ interface QueuedRequest {
   reject: (error: Error) => void;
   retryCount: number;
   maxRetries: number;
+  /** Timestamp of the original enqueue call. Never reset on retry.
+   *  Used for total wall-clock queue residence expiry. */
+  enqueuedAt: number;
+  /** Timestamp of the most recent (re-)queue. Reset on retry.
+   *  Used to compute per-attempt HTTP timeout budget. */
   addedAt: number;
   timeout: number;
 }
@@ -119,6 +129,7 @@ export class RequestQueue {
     } = {},
   ): Promise<RequestResponse> {
     return new Promise((resolve, reject) => {
+      const now = Date.now();
       const request: QueuedRequest = {
         id: `req-${++this.requestIdCounter}`,
         params,
@@ -127,7 +138,8 @@ export class RequestQueue {
         reject,
         retryCount: 0,
         maxRetries: options.maxRetries ?? this.config.maxRetries,
-        addedAt: Date.now(),
+        enqueuedAt: now,
+        addedAt: now,
         timeout: options.timeout ?? this.config.defaultTimeoutMs,
       };
 
@@ -207,10 +219,10 @@ export class RequestQueue {
         this.activeRequests < this.config.maxConcurrent &&
         !this.isPaused
       ) {
-        // Discard expired requests before consuming circuit breaker or rate limiter budget
+        // Discard requests that have exceeded their total wall-clock queue budget
         while (this.queue.length > 0) {
-          const head = this.queue[0]!;
-          if (Date.now() - head.addedAt > head.timeout) {
+          const head = this.queue[0] as QueuedRequest;
+          if (Date.now() - head.enqueuedAt > this.config.maxQueueTimeMs) {
             this.queue.shift();
             head.reject(new Error("Request timed out while waiting in queue"));
             continue;
@@ -221,14 +233,21 @@ export class RequestQueue {
 
         if (!this.isOnline) {
           for (const req of this.queue) {
-            const stored = this.offlineQueue.add(req.params, req.priority);
-            req.reject(
-              new Error(
-                stored
-                  ? "Offline: request queued for later"
-                  : "Offline: queue full, request dropped",
-              ),
-            );
+            if (hasAuthHeader(req.params)) {
+              // Auth-bearing requests cannot be replayed — tokens expire and
+              // refreshing requires network. Reject immediately instead of
+              // buffering a request that will 401 on replay.
+              req.reject(new Error("Offline: auth-required requests cannot be replayed"));
+            } else {
+              const stored = this.offlineQueue.add(req.params, req.priority);
+              req.reject(
+                new Error(
+                  stored
+                    ? "Offline: request queued for later"
+                    : "Offline: queue full, request dropped",
+                ),
+              );
+            }
           }
           this.queue = [];
           break;
@@ -251,7 +270,7 @@ export class RequestQueue {
           break;
         }
 
-        const request = this.queue.shift()!;
+        const request = this.queue.shift() as QueuedRequest;
         this.activeRequests++;
         this.executeRequest(request).finally(() => {
           this.activeRequests = Math.max(0, this.activeRequests - 1);
@@ -262,6 +281,13 @@ export class RequestQueue {
       }
     } finally {
       this.isProcessing = false;
+      // Guard against stalls: if items remain after a setTimeout-driven re-entry
+      // exits early (e.g., two close-together callbacks racing on isProcessing),
+      // schedule another drain attempt. Uses setTimeout(0) instead of queueMicrotask
+      // to yield to pending macrotasks (backoff timers, circuit breaker resets).
+      if (this.queue.length > 0 && !this.isPaused && this.activeRequests < this.config.maxConcurrent) {
+        setTimeout(() => this.processQueue(), 0);
+      }
     }
   }
 
@@ -289,7 +315,8 @@ export class RequestQueue {
         request.reject(new DOMException("The operation timed out.", "TimeoutError"));
         return;
       }
-      // Floor at 1s so very-small-but-positive budgets still allow a real HTTP attempt
+      // Floor at 1s so very-small-but-positive budgets still allow a real HTTP attempt.
+      // Note: this floor means effective max overshoot is ~1s beyond maxQueueTimeMs.
       const remainingTimeout = Math.max(1000, budget);
       const response = await this.doFetch(request.params, remainingTimeout);
 
@@ -415,11 +442,17 @@ export class RequestQueue {
 
     // Throw an enriched error for non-2xx so retry logic can inspect status
     if (!response.ok) {
-      // Drain body to free the connection — catch errors so they don't replace the HTTP error
+      // Drain body to free the connection — race against a timeout so slow error
+      // bodies don't block indefinitely after the fetch signal has fired.
       try {
-        await response.body?.cancel();
+        await Promise.race([
+          response.body?.cancel(),
+          new Promise<void>((_, reject) =>
+            setTimeout(() => reject(new Error("cancel timeout")), 2000),
+          ),
+        ]);
       } catch {
-        /* ignore stream errors */
+        /* ignore stream/timeout errors */
       }
       const err = new Error(`HTTP ${response.status}: ${response.statusText}`) as Error & {
         status: number;
@@ -484,4 +517,10 @@ function calculateBackoff(retryCount: number, baseMs: number, maxMs: number): nu
   const raw = baseMs * 2 ** (retryCount - 1);
   const jitter = raw * Math.random() * 0.25;
   return Math.min(raw + jitter, maxMs);
+}
+
+/** Check whether params carry an Authorization header (case-insensitive). */
+function hasAuthHeader(params: RequestParams): boolean {
+  if (!params.headers) return false;
+  return Object.keys(params.headers).some((k) => k.toLowerCase() === "authorization");
 }

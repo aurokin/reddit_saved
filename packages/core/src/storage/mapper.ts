@@ -1,5 +1,5 @@
-import type { RedditItem, ContentOrigin, PostRow } from "../types";
 import { THUMBNAIL_SENTINELS } from "../constants";
+import type { ContentOrigin, PostRow, RedditItem } from "../types";
 import { decodeHtmlEntities } from "../utils/html-escape";
 
 /**
@@ -55,7 +55,7 @@ export function mapRedditItemToRow(item: RedditItem, origin: ContentOrigin): Pos
 
     // Status flags
     distinguished: d.distinguished ?? null,
-    edited: typeof d.edited === "number" ? d.edited : d.edited === true ? 1 : null,
+    edited: typeof d.edited === "number" ? d.edited : d.edited === true ? 1 : 0,
     stickied: d.stickied ? 1 : 0,
     spoiler: d.spoiler ? 1 : 0,
     locked: d.locked ? 1 : 0,

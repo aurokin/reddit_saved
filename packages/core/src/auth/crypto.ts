@@ -9,7 +9,10 @@ export function generateState(bytes = 32): string {
 
 /** Generate a PKCE code_verifier (RFC 7636 §4.1): 43–128 chars, base64url-encoded */
 export function generateCodeVerifier(bytes = 32): string {
-  if (bytes < 32 || bytes > 96) throw new Error("code_verifier bytes must be 32–96 (produces 43–128 char verifier per RFC 7636)");
+  if (bytes < 32 || bytes > 96)
+    throw new Error(
+      "code_verifier bytes must be 32–96 (produces 43–128 char verifier per RFC 7636)",
+    );
   const buf = new Uint8Array(bytes);
   crypto.getRandomValues(buf);
   return base64UrlEncode(buf);

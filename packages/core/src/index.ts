@@ -22,6 +22,7 @@ export type {
   FilterSettings,
   FilterBreakdown,
   FilterResult,
+  PreviewResult,
   // Network types
   RequestParams,
   RequestResponse,
@@ -29,6 +30,7 @@ export type {
   ApiClientCallbacks,
   FetchOptions,
   FetchResult,
+  UnsaveResult,
   // Auth types
   AuthSettings,
   // Storage types
@@ -41,6 +43,12 @@ export type {
   // Tag types
   Tag,
   TagWithCount,
+  // Performance monitor types
+  RequestMetrics,
+  SyncMetrics,
+  MemorySample,
+  PerformanceSummary,
+  Bottleneck,
 } from "./types";
 
 // Constants
@@ -136,6 +144,26 @@ export { SyncStateManager } from "./sync/state-manager";
 export type { CheckpointData } from "./sync/state-manager";
 export { detectOrphans } from "./sync/diff";
 export type { OrphanDetectionResult } from "./sync/diff";
+
+// API
+export { RedditApiClient } from "./api/client";
+export type { TokenProvider } from "./api/client";
+export {
+  buildUserAgent,
+  buildContentPageRequest,
+  buildUnsaveRequest,
+  buildMeRequest,
+  buildCommentsRequest,
+  buildCommentContextRequest,
+  buildCommentThreadRequest,
+} from "./api/endpoints";
+
+// Filters
+export { FilterEngine, createEmptyBreakdown, isSafeRegex } from "./filters/engine";
+export { FILTER_PRESETS } from "./filters/presets";
+
+// Monitor
+export { PerformanceMonitor, formatDuration, formatBytes } from "./monitor/performance";
 
 // Utilities
 export { paths } from "./utils/paths";

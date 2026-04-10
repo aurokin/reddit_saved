@@ -1,7 +1,7 @@
-import { describe, test, expect } from "bun:test";
-import { decodeHtmlEntities, escapeHtml } from "../src/utils/html-escape";
-import { sanitizeFilename } from "../src/utils/file-sanitizer";
+import { describe, expect, test } from "bun:test";
 import { generateState } from "../src/auth/crypto";
+import { sanitizeFilename } from "../src/utils/file-sanitizer";
+import { decodeHtmlEntities, escapeHtml } from "../src/utils/html-escape";
 
 describe("decodeHtmlEntities", () => {
   test("decodes common entities", () => {
@@ -41,7 +41,7 @@ describe("decodeHtmlEntities", () => {
 describe("escapeHtml", () => {
   test("escapes all dangerous characters", () => {
     expect(escapeHtml('<script>alert("XSS")</script>')).toBe(
-      '&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;',
+      "&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;",
     );
   });
 

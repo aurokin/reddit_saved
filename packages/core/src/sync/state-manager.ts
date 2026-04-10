@@ -1,6 +1,6 @@
-import { mkdirSync } from "fs";
-import { unlink, rename } from "fs/promises";
-import { dirname } from "path";
+import { mkdirSync } from "node:fs";
+import { rename, unlink } from "node:fs/promises";
+import { dirname } from "node:path";
 import { paths } from "../utils/paths";
 
 /**
@@ -21,13 +21,26 @@ export interface CheckpointData {
 
 export class SyncStateManager {
   private checkpointPath: string;
+  private savePromise: Promise<void> = Promise.resolve();
+  private onSaveError?: (error: unknown) => void;
 
-  constructor(checkpointPath?: string) {
+  constructor(checkpointPath?: string, onSaveError?: (error: unknown) => void) {
     this.checkpointPath = checkpointPath ?? paths.checkpoint;
+    this.onSaveError = onSaveError;
     mkdirSync(dirname(this.checkpointPath), { recursive: true });
   }
 
+  /** Load checkpoint from disk. Returns null if no checkpoint exists or it's corrupt.
+   *  Note: fetchedIds/failedIds are not persisted — after crash recovery, progress
+   *  tracking restarts from 0. Items are deduplicated via storage upsert. */
   async load(): Promise<CheckpointData | null> {
+    // Best-effort cleanup of orphaned .tmp file from a previous interrupted save()
+    try {
+      await unlink(`${this.checkpointPath}.tmp`);
+    } catch {
+      // Expected: .tmp usually doesn't exist
+    }
+
     const file = Bun.file(this.checkpointPath);
     if (!(await file.exists())) return null;
 
@@ -45,20 +58,53 @@ export class SyncStateManager {
       return null;
     }
 
+    // Normalize: save() always writes empty arrays, but external/older
+    // checkpoints may have populated arrays. Normalize to match save() contract.
+    parsed.fetchedIds = [];
+    parsed.failedIds = [];
+
     return parsed;
   }
 
   async save(data: CheckpointData): Promise<void> {
+    const prev = this.savePromise;
+    const onErr = this.onSaveError;
+    const current = prev
+      .catch((err) => {
+        if (onErr) {
+          onErr(err);
+        } else {
+          console.warn("SyncStateManager: save failed (no onSaveError handler)", err);
+        }
+      })
+      .then(() => this._doSave(data));
+    // Store the raw promise so the next save's .catch() can surface this save's error.
+    // Attach a no-op handler to prevent unhandled rejection if no subsequent save follows.
+    this.savePromise = current;
+    current.catch(() => {});
+    return current;
+  }
+
+  private async _doSave(data: CheckpointData): Promise<void> {
     // Don't persist fetchedIds/failedIds — they can be large and are redundant
     // with cursor-based resumption + DB upsert dedup. Keep them in-memory only.
     const { fetchedIds: _f, failedIds: _d, ...rest } = data;
-    const toWrite = { ...rest, fetchedIds: [] as string[], failedIds: [] as string[], updatedAt: Date.now() };
+    const toWrite = {
+      ...rest,
+      fetchedIds: [] as string[],
+      failedIds: [] as string[],
+      updatedAt: Date.now(),
+    };
     const tmp = `${this.checkpointPath}.tmp`;
     try {
       await Bun.write(tmp, JSON.stringify(toWrite, null, 2));
       await rename(tmp, this.checkpointPath);
     } catch (err) {
-      try { await unlink(tmp); } catch { /* best effort cleanup */ }
+      try {
+        await unlink(tmp);
+      } catch {
+        /* best effort cleanup */
+      }
       throw err;
     }
   }

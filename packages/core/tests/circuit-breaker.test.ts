@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { CircuitBreaker, type CircuitBreakerConfig } from "../src/queue/circuit-breaker";
 
 const config: CircuitBreakerConfig = {
@@ -83,9 +83,9 @@ describe("CircuitBreaker", () => {
     for (let i = 0; i < 3; i++) cb.recordFailure();
     await Bun.sleep(350);
 
-    expect(cb.allowRequest()).toBe(true);   // first probe: allowed, flag set
+    expect(cb.allowRequest()).toBe(true); // first probe: allowed, flag set
     expect(cb.getState()).toBe("half-open");
-    expect(cb.allowRequest()).toBe(false);  // second probe: blocked while first is in flight
+    expect(cb.allowRequest()).toBe(false); // second probe: blocked while first is in flight
   });
 
   test("old failures outside window are cleaned", async () => {
@@ -98,5 +98,56 @@ describe("CircuitBreaker", () => {
     // After cleanup, failure count should be 0, so request should be allowed
     expect(cb.allowRequest()).toBe(true);
     expect(cb.getState()).toBe("closed");
+  });
+
+  test("releaseProbe allows next probe in half-open state", async () => {
+    const cb = new CircuitBreaker(config);
+    for (let i = 0; i < 3; i++) cb.recordFailure();
+    await Bun.sleep(350);
+
+    // First probe: allowed, sets halfOpenProbeInFlight
+    expect(cb.allowRequest()).toBe(true);
+    expect(cb.getState()).toBe("half-open");
+
+    // Second probe blocked while first in flight
+    expect(cb.allowRequest()).toBe(false);
+
+    // Release probe without success/failure — allows next probe
+    cb.releaseProbe();
+    expect(cb.allowRequest()).toBe(true);
+  });
+
+  test("recordFailure in open state does not defer half-open transition", async () => {
+    const cb = new CircuitBreaker(config);
+    // Trip to open
+    for (let i = 0; i < 3; i++) cb.recordFailure();
+    expect(cb.getState()).toBe("open");
+
+    const retryBefore = cb.getTimeUntilRetry();
+
+    // Wait a bit, then record another failure while still open
+    await Bun.sleep(50);
+    cb.recordFailure();
+
+    // State should still be open
+    expect(cb.getState()).toBe("open");
+
+    // getTimeUntilRetry should have decreased (not reset),
+    // proving lastFailureTime was not updated
+    const retryAfter = cb.getTimeUntilRetry();
+    expect(retryAfter).toBeLessThan(retryBefore);
+
+    // Wait for the original reset timeout and confirm half-open works on schedule
+    await Bun.sleep(200);
+    expect(cb.allowRequest()).toBe(true);
+    expect(cb.getState()).toBe("half-open");
+  });
+
+  test("releaseProbe is no-op when not in half-open", () => {
+    const cb = new CircuitBreaker(config);
+    // Closed state — releaseProbe should not throw or change state
+    cb.releaseProbe();
+    expect(cb.getState()).toBe("closed");
+    expect(cb.allowRequest()).toBe(true);
   });
 });

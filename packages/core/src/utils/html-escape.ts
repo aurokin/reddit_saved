@@ -18,14 +18,17 @@ const HTML_ENTITIES: Record<string, string> = {
   "&#34;": '"',
 };
 
-const ENTITY_PATTERN = /&(?:amp|lt|gt|quot|apos|nbsp|mdash|ndash|hellip|#039|#39|#x27|#x2F|#38|#60|#62|#34);/g;
+const ENTITY_PATTERN =
+  /&(?:amp|lt|gt|quot|apos|nbsp|mdash|ndash|hellip|#039|#39|#x27|#x2F|#38|#60|#62|#34);/g;
 
 /** Decode known HTML entities, plus generic numeric/hex entities as fallback. */
 export function decodeHtmlEntities(str: string): string {
   return str
     .replace(ENTITY_PATTERN, (match) => HTML_ENTITIES[match] ?? match)
     .replace(/&#(\d+);/g, (match, dec) => safeFromCodePoint(Number(dec), match))
-    .replace(/&#x([0-9a-f]+);/gi, (match, hex) => safeFromCodePoint(Number.parseInt(hex, 16), match));
+    .replace(/&#x([0-9a-f]+);/gi, (match, hex) =>
+      safeFromCodePoint(Number.parseInt(hex, 16), match),
+    );
 }
 
 /** Convert a codepoint to a character, returning the original match for invalid or
