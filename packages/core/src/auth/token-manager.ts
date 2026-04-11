@@ -23,7 +23,7 @@ export class TokenManager {
   private settings: AuthSettings | null = null;
 
   /** Load auth settings from disk, or return null if not authenticated */
-  async load(): Promise<AuthSettings | null> {
+  async load(options: { requireClientSecret?: boolean } = {}): Promise<AuthSettings | null> {
     const file = Bun.file(paths.authFile);
     if (!(await file.exists())) return null;
 
@@ -55,8 +55,9 @@ export class TokenManager {
       );
     }
 
+    const requireClientSecret = options.requireClientSecret ?? true;
     const clientSecret = process.env.REDDIT_CLIENT_SECRET ?? loaded.clientSecret;
-    if (!clientSecret) {
+    if (!clientSecret && requireClientSecret) {
       const err = new Error(
         "REDDIT_CLIENT_SECRET env var is not set. This is required for token refresh. " +
           "Set the env var and retry, or re-authenticate with 'reddit-saved auth login'.",
@@ -64,7 +65,10 @@ export class TokenManager {
       err.code = "CLIENT_SECRET_MISSING";
       throw err;
     }
-    this.settings = { ...loaded, clientSecret } as AuthSettings;
+    this.settings = {
+      ...loaded,
+      clientSecret: clientSecret ?? "",
+    } as AuthSettings;
     return this.settings;
   }
 
@@ -177,7 +181,10 @@ export class TokenManager {
       } catch (loadErr) {
         // Only swallow errors about missing clientSecret (expected when env var is unset).
         // Re-throw I/O errors, corruption, or validation failures — those indicate real problems.
-        if (loadErr instanceof Error && (loadErr as Error & { code?: string }).code === "CLIENT_SECRET_MISSING") {
+        if (
+          loadErr instanceof Error &&
+          (loadErr as Error & { code?: string }).code === "CLIENT_SECRET_MISSING"
+        ) {
           // Fall through to use in-memory settings below.
         } else {
           throw loadErr;

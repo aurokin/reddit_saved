@@ -221,6 +221,14 @@ export class SqliteAdapter implements StorageAdapter {
       where.push("p.kind = ?");
       params.push(opts.kind);
     }
+    if (opts.createdAfter !== undefined) {
+      where.push("p.created_utc >= ?");
+      params.push(opts.createdAfter);
+    }
+    if (opts.createdBefore !== undefined) {
+      where.push("p.created_utc <= ?");
+      params.push(opts.createdBefore);
+    }
 
     if (opts.tag) {
       where.push(TAG_FILTER_SQL);

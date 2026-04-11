@@ -512,7 +512,7 @@ Exit codes: 0=success, 1=error, 2=auth required
 5. Port monitor/performance.ts
 6. Tests
 
-### Phase 3: CLI
+### Phase 3: CLI (Under Review)
 1. Entry point, arg parser (hand-rolled, handles nested subcommands), output formatters
 2. `auth login/status/logout` (login uses core oauth-server)
 3. `fetch` + `search` + `list` + `status` (search/list support --tag, --orphaned, --author)

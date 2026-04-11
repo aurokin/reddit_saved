@@ -463,6 +463,10 @@ export interface SearchOptions {
   /** true = orphaned only, false/undefined = active only, "all" = both */
   orphaned?: boolean | "all";
   kind?: "t1" | "t3";
+  /** Unix timestamp in seconds; include rows created at or after this time */
+  createdAfter?: number;
+  /** Unix timestamp in seconds; include rows created at or before this time */
+  createdBefore?: number;
   limit?: number;
   offset?: number;
 }

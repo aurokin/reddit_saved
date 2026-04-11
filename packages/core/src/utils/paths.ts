@@ -2,8 +2,13 @@ import { homedir, platform } from "node:os";
 import { join } from "node:path";
 
 const APP_NAME = "reddit-saved";
+const CUSTOM_CONFIG_DIR_ENV = "REDDIT_SAVED_CONFIG_DIR";
 
 function getConfigDir(): string {
+  const customConfigDir = process.env[CUSTOM_CONFIG_DIR_ENV];
+  if (customConfigDir) {
+    return customConfigDir;
+  }
   const p = platform();
   if (p === "win32") {
     return join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), APP_NAME);
