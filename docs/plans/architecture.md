@@ -2,7 +2,7 @@
 
 ## Context
 
-We analyzed 9 GitHub projects for managing Reddit saved posts. **saved-reddit-exporter** (Obsidian plugin, 99 commits) has the most production-grade Reddit API layer: circuit breaker, token bucket rate limiting, exponential backoff, resumable pagination, and offline queue. We're using it as a reference to build a new standalone tool with two interfaces: a CLI for agent/programmatic use and a React web app for humans.
+We analyzed 9 GitHub projects for managing Reddit saved posts. **saved-reddit-exporter** (Obsidian plugin, 99 commits) has the most production-grade Reddit API layer: circuit breaker, token bucket rate limiting, exponential backoff, resumable pagination, and offline queue. We're using it as a reference to build a new standalone tool with a production-focused CLI first, plus a planned React web app.
 
 **Core feature**: Local full-text search over Reddit saved posts. Reddit's API is paginated and slow — we fetch once, cache locally in SQLite, and all search/browse/filter operations are instant against the local DB. Incremental sync keeps the cache fresh. Custom tags (not a Reddit feature) let users organize and group posts beyond what Reddit provides.
 
@@ -41,7 +41,6 @@ reddit-saved/
 │   │   │   ├── tags/
 │   │   │   │   └── tag-manager.ts     # CRUD for tags + post-tag associations
 │   │   │   ├── storage/
-│   │   │   │   ├── interface.ts       # StorageAdapter interface
 │   │   │   │   ├── sqlite-adapter.ts  # bun:sqlite with FTS5
 │   │   │   │   ├── mapper.ts          # mapRedditItemToRow: RedditItem → PostRow
 │   │   │   │   ├── schema.ts          # DDL + migrations
@@ -60,24 +59,18 @@ reddit-saved/
 │   ├── cli/                           # @reddit-saved/cli (zero npm deps)
 │   │   ├── src/
 │   │   │   ├── index.ts               # Entry: arg parser, command dispatch
-│   │   │   ├── cli.ts                 # Global options (--json, --human, -v)
+│   │   │   ├── args.ts                # Hand-rolled arg parser + flag helpers
+│   │   │   ├── context.ts             # Shared command bootstrap (storage/auth/api)
 │   │   │   ├── output.ts              # JSON/table/progress formatters
-│   │   │   ├── config.ts              # ~/.config/reddit-saved/ management
 │   │   │   ├── auth/                  # login (uses core oauth-server), status, logout
 │   │   │   └── commands/              # fetch, search, list, export, status, unsave, tag
 │   │   └── tests/
 │   │
-│   └── web/                           # @reddit-saved/web
-│       ├── vite.config.ts
-│       ├── src/
-│       │   ├── main.tsx
-│       │   ├── api/
-│       │   │   ├── server.ts          # Bun.serve() API on :3001 (data + proxy)
-│       │   │   └── routes/            # auth (uses core oauth-server), posts, sync, export, tags
-│       │   ├── components/            # PostCard, PostList, SearchBar, FilterPanel, etc.
-│       │   ├── pages/                 # Home, Browse, Post, Settings, Login
-│       │   └── hooks/                 # useSearch, usePosts, useSync, useAuth
-│       └── tests/
+│   └── web/                           # @reddit-saved/web (package scaffold only)
+│       ├── package.json
+│       ├── tsconfig.json
+│       └── src/
+│           └── index.ts               # Placeholder entry; app not implemented yet
 ```
 
 ## Key Design Decisions
@@ -85,10 +78,10 @@ reddit-saved/
 | Decision | Choice | Why |
 |---|---|---|
 | Storage | SQLite via `bun:sqlite` | Zero deps, FTS5 for search, single-file portable |
-| Search | FTS5 with `porter unicode61` tokenizer, BM25 ranking | Covers title/selftext/body/subreddit/author. Tag-filtered search via JOIN. Sufficient for <=1000 items |
-| Auth | Single Reddit **"web app"** (requires client_secret), shared `localhost:9638` redirect URI for both CLI and Web. `TokenManager` in core handles exchange/refresh. File-lock (`auth.lock`) prevents concurrent token refresh races. | Reddit allows only ONE redirect URI per app. "Web app" type chosen because localhost redirect requires client_secret. Both surfaces share the callback — web initiates OAuth via :9638, handler writes auth.json then redirects browser to `http://localhost:3001`, SPA polls `/api/auth/status` |
+| Search | FTS5 with `porter unicode61` tokenizer, BM25 ranking | Covers title/selftext/body/subreddit/author. Tag-filtered search is implemented with tag subqueries/`EXISTS` to avoid FTS5 auxiliary-function constraints. Sufficient for <=1000 items |
+| Auth | Single Reddit **"web app"** (requires client_secret), with CLI OAuth implemented on `localhost:9638`. `TokenManager` in core handles exchange/refresh. File-lock (`auth.lock`) prevents concurrent token refresh races. | Reddit allows only ONE redirect URI per app. "Web app" type chosen because localhost redirect requires client_secret. The CLI flow is implemented now; the same callback can be reused by a future web surface |
 | CLI output | JSON to stdout (default), `--human` flag for tables | Agent-first, composable with jq/pipes. Errors to stderr |
-| Web | React 19 SPA (Vite) + Bun.serve() API on :3001 | Clean separation; API server reuses same core + SQLite as CLI |
+| Web | React 19 SPA (Vite) + Bun.serve() API on :3001 | Planned architecture only. The `@reddit-saved/web` package exists, but the app/server files are not implemented yet |
 | Config/data paths | Platform-aware: Linux `$XDG_CONFIG_HOME` / `$XDG_DATA_HOME` (fallback `~/.config`, `~/.local/share`), macOS `~/Library/Application Support`, Windows `%APPDATA%`. Subdirectory: `reddit-saved/` | Cross-platform via a `paths.ts` utility in core |
 | Formatter | Biome | Faster than ESLint+Prettier, single tool |
 | Tags | Custom tags in SQLite (local-only, not synced to Reddit) | Reddit API has no tag/label support; local tags enable user-defined grouping and filtering |
@@ -116,7 +109,7 @@ reddit-saved/
 - SQLite storage layer (schema, adapter, FTS5 triggers, migrations)
 - Tag system (tag-manager.ts — CRUD, post-tag associations, tag-filtered search)
 - Entire CLI (arg parsing, commands, output formatting, OAuth server)
-- Entire web app (API server, React SPA, components)
+- Web package scaffold only (dependencies/scripts are present; app/server implementation is still Phase 4 work)
 
 ## SQLite Schema
 
@@ -152,7 +145,7 @@ CREATE TABLE posts (
 
     -- Status flags
     distinguished TEXT,            -- 'moderator', 'admin', or NULL
-    edited INTEGER DEFAULT 0,      -- 0 or unix timestamp of last edit
+    edited INTEGER DEFAULT NULL,   -- 0/1/timestamp depending on Reddit payload normalization
     stickied INTEGER DEFAULT 0,
     spoiler INTEGER DEFAULT 0,
     locked INTEGER DEFAULT 0,
@@ -189,7 +182,7 @@ CREATE INDEX idx_post_tags_tag ON post_tags(tag_id);
 
 -- Sync state tracking
 CREATE TABLE sync_state (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL);
--- Keys: last_cursor, last_sync_time, last_full_sync_time, session_id, total_fetched
+-- Keys used today: last_cursor, last_sync_time, last_full_sync_time
 
 CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL);
 ```
@@ -202,7 +195,7 @@ CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at INTEGER NOT
 
 ### StorageAdapter interface
 
-`storage/interface.ts` defines the contract. `SqliteAdapter` implements it. `TagManager` takes the same `Database` handle but has its own API — it's not behind `StorageAdapter`.
+`types.ts` defines the contract. `SqliteAdapter` implements it. `TagManager` takes the same `Database` handle but has its own API — it's not behind `StorageAdapter`.
 
 ```typescript
 interface StorageAdapter {
@@ -211,7 +204,7 @@ interface StorageAdapter {
   getPost(id: string): PostRow | null;
   listPosts(opts: ListOptions): PostRow[];         // filter, sort, paginate
   searchPosts(query: string, opts: SearchOptions): SearchResult[];  // FTS5
-  markOrphaned(olderThan: number): number;          // returns count affected
+  markOrphaned(olderThan: number, origin?: ContentOrigin): number; // olderThan is epoch ms; optional origin scope
   getStats(): DbStats;                              // totals, subreddit counts, etc.
 
   // Sync state (key-value for completed-sync metadata)
@@ -224,6 +217,9 @@ interface StorageAdapter {
   // Maintenance
   rebuildFtsIndex(): void;
   assertFts5Available(): void;                      // startup check
+
+  // Lifecycle
+  close(): void;
 }
 ```
 
@@ -267,7 +263,7 @@ interface ApiClientCallbacks {
   onPageFetched?: (pageNum: number, itemCount: number, cursor: string) => void;
 }
 ```
-CLI implements these to write progress to stderr. Web implements them to push SSE events.
+CLI implements these to write progress to stderr. The planned web layer can reuse the same callback bag later.
 
 ### Sync state vs sync_state table
 
@@ -302,12 +298,15 @@ class RedditApiClient {
   fetchUserPosts(opts?: FetchOptions): Promise<FetchResult>;
   fetchUserComments(opts?: FetchOptions): Promise<FetchResult>;
 
-  // Single item
-  fetchPostComments(permalink: string, threshold?: number): Promise<RedditComment[]>;
+  // Comment reads
+  fetchPostComments(permalink: string, threshold?: number, sort?: CommentSortOrder, signal?: AbortSignal): Promise<RedditComment[]>;
+  fetchCommentWithContext(commentPermalink: string, contextDepth?: number, signal?: AbortSignal): Promise<RedditItemData | null>;
+  fetchCommentReplies(commentPermalink: string, maxDepth?: number, signal?: AbortSignal): Promise<RedditItemData[]>;
+  fetchCommentThread(postPermalink: string, signal?: AbortSignal): Promise<CommentThread | null>;
 
   // Actions
   unsaveItem(fullname: string): Promise<void>;        // POST /api/unsave
-  unsaveItems(fullnames: string[]): Promise<void>;     // batch with rate limiting
+  unsaveItems(fullnames: string[]): Promise<UnsaveResult>; // batch with per-item result tracking
 
   // Auth
   fetchUsername(): Promise<string>;                     // GET /api/v1/me
@@ -361,10 +360,10 @@ During `fetch`, all inserts happen inside a single SQLite transaction. For bulk 
 1. `DROP TRIGGER` the three FTS sync triggers (posts_ai, posts_ad, posts_au)
 2. Wrap all inserts in `db.transaction(() => { ... })` (bun:sqlite's preferred API)
 3. Insert/upsert into `posts` table
-4. After commit, recreate the triggers, then run `INSERT INTO posts_fts(posts_fts) VALUES('rebuild')` to rebuild the full FTS index
+4. Recreate the triggers, then run `INSERT INTO posts_fts(posts_fts) VALUES('rebuild')` to rebuild the full FTS index
 5. For single-item operations (tag, unsave, individual inserts), the per-row triggers handle FTS sync
 
-On startup, always run `rebuild` if the DB exists — this handles crash recovery where triggers may have been dropped but not recreated.
+On startup, check that the FTS triggers exist and run `integrity-check`; only recreate triggers and rebuild the index if that consistency check fails.
 
 ### Search query pattern
 
@@ -386,18 +385,27 @@ WHERE posts_fts MATCH ?
 ORDER BY rank
 LIMIT ? OFFSET ?;
 
--- Tag-filtered search
+-- Tag-filtered search uses EXISTS/subqueries rather than JOIN + GROUP BY,
+-- because FTS5 auxiliary functions (bm25/snippet) need direct posts_fts context.
 SELECT p.*,
        coalesce(
          snippet(posts_fts, 0, '<b>', '</b>', '...', 32),
          snippet(posts_fts, 2, '<b>', '</b>', '...', 32)
-       ) AS snippet
+       ) AS snippet,
+       (SELECT GROUP_CONCAT(t.name, '||')
+          FROM post_tags pt
+          JOIN tags t ON t.id = pt.tag_id
+         WHERE pt.post_id = p.id) AS tags
 FROM posts_fts
 JOIN posts p ON posts_fts.rowid = p.rowid
-JOIN post_tags pt ON pt.post_id = p.id
-JOIN tags t ON t.id = pt.tag_id
 WHERE posts_fts MATCH ?
-  AND t.name = ?
+  AND EXISTS (
+    SELECT 1
+    FROM post_tags pt2
+    JOIN tags t2 ON t2.id = pt2.tag_id
+    WHERE pt2.post_id = p.id
+      AND t2.name = ?
+  )
 ORDER BY bm25(posts_fts);
 ```
 
@@ -410,11 +418,11 @@ ORDER BY bm25(posts_fts);
   "refreshToken": "...",
   "tokenExpiry": 1712345678000,
   "username": "...",
-  "clientId": "...",
-  "clientSecret": "..."
+  "clientId": "..."
 }
 ```
 - **App type**: Reddit "web app" — requires non-empty `clientSecret` for token exchange
+- **Secret handling**: `clientSecret` is kept in memory and sourced from `REDDIT_CLIENT_SECRET` (or the initial login call); it is intentionally not persisted back to disk
 - **Username**: fetched via `GET /api/v1/me` after initial token exchange and cached. Used for API endpoint URLs (`/user/{username}/saved`)
 - **User-Agent**: `bun:reddit-saved:v0.1.0 (by /u/{username})` — Reddit requires descriptive user agents
 
@@ -436,7 +444,7 @@ During the OAuth flow, the `:9638` callback server stores the CSRF state in clos
 3. On callback, validate state matches and hasn't expired
 4. If `returnTo` is set (web-initiated), redirect browser there after writing auth.json
 
-### Web auth return flow
+### Planned web auth return flow (Phase 4)
 
 1. SPA on `:3001` redirects user to `/api/auth/login`
 2. API server starts `:9638` OAuth callback server (if not running), passing `returnTo=http://localhost:3001`
@@ -450,27 +458,29 @@ During the OAuth flow, the `:9638` callback server stores the CSRF state in clos
 
 ### First-run experience
 
-If any command is run before `auth login`, it exits with code 2 and prints to stderr:
+If a command that requires Reddit auth is run before `auth login` (`fetch`, or non-dry-run `unsave`), it exits with code 2 and prints to stderr:
 ```json
 {"error": "Not authenticated. Run 'reddit-saved auth login' first.", "code": "AUTH_REQUIRED"}
 ```
-In `--human` mode: `Error: Not authenticated. Run 'reddit-saved auth login' to connect your Reddit account.`
+In `--human` mode: `Error: Not authenticated. Run 'reddit-saved auth login' first.`
 
 ## CLI Commands
 
 ```
 reddit-saved auth login|status|logout
-reddit-saved fetch [--full] [--type saved|upvoted|submitted|comments]
+reddit-saved fetch [--full] [--type saved|upvoted|submitted|comments] [--limit N]
 reddit-saved search <query> [--subreddit X] [--author A] [--min-score N] [--after DATE]
                             [--before DATE] [--tag TAG] [--orphaned] [--type post|comment]
                             [--limit N] [--offset N]
 reddit-saved list [--subreddit X] [--author A] [--min-score N] [--tag TAG] [--orphaned]
-                  [--type post|comment] [--sort created|score] [--limit N] [--offset N]
+                  [--type post|comment] [--origin saved|upvoted|submitted|commented]
+                  [--sort created|score] [--sort-direction asc|desc] [--limit N] [--offset N]
                   # browse without FTS query — just filters + sort
-reddit-saved export [--format json|csv|markdown] [--output PATH]
+reddit-saved export [--format json|csv|markdown] [--output PATH] [--subreddit X] [--tag TAG]
+                    [--orphaned] [--type post|comment] [--limit N] [--include-raw]
 reddit-saved status                    # includes orphaned count, tag counts
 reddit-saved unsave [--id ID...] [--subreddit X] [--tag TAG] [--orphaned]
-                    [--dry-run] --confirm
+                    [--limit N] [--dry-run] --confirm
                     # Flow: query local DB with filters → show matching items →
                     # if --confirm: call Reddit POST /api/unsave for each item's
                     # fullname, then mark is_on_reddit=0 locally.
@@ -500,7 +510,7 @@ Exit codes: 0=success, 1=error, 2=auth required
 4. Port queue classes (CircuitBreaker, RateLimiter) — extract from single file to individual modules
 5. Write OfflineQueue + RequestQueue with native fetch() + AbortSignal and new request types
 6. Write auth/token-manager.ts + auth/crypto.ts + auth/oauth-state.ts + auth/oauth-server.ts
-7. Write storage/interface.ts + schema.ts + mapper.ts + sqlite-adapter.ts + FTS5 (including tags tables, bulk rebuild strategy, startup FTS5 assertion via `pragma_compile_options`, crash-recovery rebuild)
+7. Write storage types/interface in `types.ts` + schema.ts + mapper.ts + sqlite-adapter.ts + FTS5 (including tags tables, bulk rebuild strategy, startup FTS5 assertion, crash-recovery rebuild)
 8. Write tags/tag-manager.ts (CRUD, post-tag associations, takes Database handle directly)
 9. Tests for all above
 
@@ -512,7 +522,7 @@ Exit codes: 0=success, 1=error, 2=auth required
 5. Port monitor/performance.ts
 6. Tests
 
-### Phase 3: CLI (Under Review)
+### Phase 3: CLI (Implemented, under review)
 1. Entry point, arg parser (hand-rolled, handles nested subcommands), output formatters
 2. `auth login/status/logout` (login uses core oauth-server)
 3. `fetch` + `search` + `list` + `status` (search/list support --tag, --orphaned, --author)
@@ -528,31 +538,24 @@ Exit codes: 0=success, 1=error, 2=auth required
 5. Tests
 
 ## Verification
-- `bun test` — all packages
-- `bun run packages/cli/src/index.ts auth login` — completes OAuth flow
-- `bun run packages/cli/src/index.ts fetch --human` — fetches posts with progress
-- `bun run packages/cli/src/index.ts search "test query"` — returns JSON results
-- `bun run packages/cli/src/index.ts search "rust" --tag ml` — tag-filtered search
-- `bun run packages/cli/src/index.ts tag create "machine-learning" --color "#4ade80"` — creates tag
-- `bun run packages/cli/src/index.ts tag add "machine-learning" --to abc123` — tags a post
-- `bun run packages/cli/src/index.ts fetch --full` — detects orphaned saves
-- `bun run packages/cli/src/index.ts list --subreddit rust --limit 10` — browse without FTS query
-- `bun run packages/cli/src/index.ts export --format json --output ./export.json` — exports to file
-- `bun run packages/cli/src/index.ts unsave --id abc123 --dry-run --confirm` — dry-run unsave
-- `bun run packages/cli/src/index.ts status` — shows total, orphaned, tag counts
-- `bun run dev:web` — SPA loads, can browse/search/tag saved posts
+- `bun test packages/core/tests` — passes
+- `bun test packages/cli/tests` — passes
+- `bun run packages/cli/src/index.ts --help` — prints current CLI surface
+- `bun run --filter @reddit-saved/web typecheck` — passes for the current placeholder package
+- `bun run --filter @reddit-saved/web build` — currently fails because the web app scaffold is incomplete (`index.html` missing)
 
 ## Known Limitations & Future Work
 - **Reddit 1000-item API cap**: Reddit's listing endpoints return max 1000 items. Users with >1000 saves will only get the newest 1000 via the API. Orphan detection is disabled when local count >= 1000 to avoid false positives. Future: investigate GDPR data export (used by Reddit-Saved-Post-Extractor) as a bypass for initial import.
 - **Single redirect URI**: One Reddit app, one callback at localhost:9638. Both CLI and web share it. If both start an OAuth flow simultaneously, port conflict occurs — document this. Token refresh is safe via file-lock.
 - **No backup**: SQLite DB backup is not implemented. Users can manually copy the DB file. May add `reddit-saved backup` in the future.
 - **CLI arg parsing complexity**: Zero npm deps means hand-rolled arg parser. Nested subcommands (`tag create`, `tag add`) are non-trivial — acknowledge implementation effort in Phase 3.
-- **FTS crash recovery**: If the process crashes between dropping triggers and rebuilding the FTS index, the index will be stale. Mitigated by running `rebuild` on every startup.
+- **FTS crash recovery**: If the process crashes between dropping triggers and rebuilding the FTS index, the index may be stale. Mitigated by startup trigger/integrity checks that rebuild only when needed.
+- **Web package is still a scaffold**: `@reddit-saved/web` has dependencies and scripts, but no app shell/API server yet. Build currently fails because Vite has no `index.html`
 
 ## Reference Files
-- `/home/auro/code/reddit_saved/saved-reddit-exporter/src/request-queue.ts` — CircuitBreaker (L84-185), RateLimiter (L190-264), OfflineQueue (L269-326), RequestQueue (L331-679)
-- `/home/auro/code/reddit_saved/saved-reddit-exporter/src/types.ts` — All Reddit types
-- `/home/auro/code/reddit_saved/saved-reddit-exporter/src/api-client.ts` — RedditApiClient pagination/rate limit patterns
-- `/home/auro/code/reddit_saved/saved-reddit-exporter/src/auth.ts` — Token exchange (L480-510), refresh (L512-542), validation (L544-548)
-- `/home/auro/code/reddit_saved/saved-reddit-exporter/src/filters.ts` — FilterEngine, zero Obsidian deps
-- `/home/auro/code/reddit_saved/saved-reddit-exporter/src/constants.ts` — OAuth URLs, rate limit values
+- `/home/auro/code/reddit_saved/reference/saved-reddit-exporter/src/request-queue.ts` — CircuitBreaker (L84-185), RateLimiter (L190-264), OfflineQueue (L269-326), RequestQueue (L331-679)
+- `/home/auro/code/reddit_saved/reference/saved-reddit-exporter/src/types.ts` — All Reddit types
+- `/home/auro/code/reddit_saved/reference/saved-reddit-exporter/src/api-client.ts` — RedditApiClient pagination/rate limit patterns
+- `/home/auro/code/reddit_saved/reference/saved-reddit-exporter/src/auth.ts` — Token exchange (L480-510), refresh (L512-542), validation (L544-548)
+- `/home/auro/code/reddit_saved/reference/saved-reddit-exporter/src/filters.ts` — FilterEngine, zero Obsidian deps
+- `/home/auro/code/reddit_saved/reference/saved-reddit-exporter/src/constants.ts` — OAuth URLs, rate limit values
