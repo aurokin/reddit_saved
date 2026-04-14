@@ -9,7 +9,7 @@
     "dev": "bun run src/index.ts",
     "build": "bun build ./src/index.ts --compile --outfile reddit-saved",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "bunx tsc --noEmit"
   },
   "dependencies": {
     "@reddit-saved/core": "workspace:*"
