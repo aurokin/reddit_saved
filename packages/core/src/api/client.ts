@@ -449,12 +449,8 @@ export class RedditApiClient {
       }
 
       // Surface rate-limit state to consumers (CLI progress, web SSE)
-      const rlRemaining = Number.parseFloat(
-        response.headers.get("x-ratelimit-remaining") ?? "",
-      );
-      const rlResetSec = Number.parseFloat(
-        response.headers.get("x-ratelimit-reset") ?? "",
-      );
+      const rlRemaining = Number.parseFloat(response.headers.get("x-ratelimit-remaining") ?? "");
+      const rlResetSec = Number.parseFloat(response.headers.get("x-ratelimit-reset") ?? "");
       if (Number.isFinite(rlRemaining) && Number.isFinite(rlResetSec) && rlRemaining < 10) {
         this.callbacks.onRateLimit?.(rlResetSec * 1000, rlRemaining);
       }

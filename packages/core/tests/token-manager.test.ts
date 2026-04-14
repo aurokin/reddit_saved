@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AUTH_FETCH_TIMEOUT_MS } from "../src/constants";
 import { TokenManager } from "../src/auth/token-manager";
+import { AUTH_FETCH_TIMEOUT_MS } from "../src/constants";
+import type { AuthSettings } from "../src/types";
 
 // ---------------------------------------------------------------------------
 // Test infrastructure
@@ -47,6 +48,18 @@ function mockFetch(handlers: {
   globalThis.fetch = mockFn as unknown as typeof fetch;
 }
 
+function expectLoadedSettings(settings: AuthSettings | null): AuthSettings {
+  expect(settings).not.toBeNull();
+  if (!settings) {
+    throw new Error("Expected auth settings to load");
+  }
+  return settings;
+}
+
+function setInternalSettings(manager: TokenManager, settings: AuthSettings): void {
+  (manager as unknown as { settings: AuthSettings | null }).settings = settings;
+}
+
 beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-token-test-"));
   configDir = join(tempDir, "reddit-saved");
@@ -66,12 +79,12 @@ afterEach(() => {
   if (originalEnv.REDDIT_CLIENT_SECRET !== undefined) {
     process.env.REDDIT_CLIENT_SECRET = originalEnv.REDDIT_CLIENT_SECRET;
   } else {
-    delete process.env.REDDIT_CLIENT_SECRET;
+    process.env.REDDIT_CLIENT_SECRET = undefined;
   }
   if (originalEnv.XDG_CONFIG_HOME !== undefined) {
     process.env.XDG_CONFIG_HOME = originalEnv.XDG_CONFIG_HOME;
   } else {
-    delete process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = undefined;
   }
   rmSync(tempDir, { recursive: true, force: true });
 });
@@ -89,32 +102,28 @@ describe("load", () => {
   test("loads valid auth.json with env var clientSecret", async () => {
     writeFileSync(authFilePath, JSON.stringify(validAuthJson()));
     const tm = new TokenManager();
-    const settings = await tm.load();
-    expect(settings).not.toBeNull();
-    expect(settings!.accessToken).toBe("test-access-token");
-    expect(settings!.refreshToken).toBe("test-refresh-token");
-    expect(settings!.clientId).toBe("test-client-id");
-    expect(settings!.username).toBe("testuser");
-    expect(settings!.clientSecret).toBe("test-client-secret"); // from env
+    const settings = expectLoadedSettings(await tm.load());
+    expect(settings.accessToken).toBe("test-access-token");
+    expect(settings.refreshToken).toBe("test-refresh-token");
+    expect(settings.clientId).toBe("test-client-id");
+    expect(settings.username).toBe("testuser");
+    expect(settings.clientSecret).toBe("test-client-secret"); // from env
   });
 
   test("env var clientSecret overrides file value", async () => {
     writeFileSync(authFilePath, JSON.stringify(validAuthJson({ clientSecret: "file-secret" })));
     process.env.REDDIT_CLIENT_SECRET = "env-secret";
     const tm = new TokenManager();
-    const settings = await tm.load();
-    expect(settings!.clientSecret).toBe("env-secret");
+    const settings = expectLoadedSettings(await tm.load());
+    expect(settings.clientSecret).toBe("env-secret");
   });
 
   test("falls back to file clientSecret when env var is not set", async () => {
-    writeFileSync(
-      authFilePath,
-      JSON.stringify(validAuthJson({ clientSecret: "file-secret" })),
-    );
-    delete process.env.REDDIT_CLIENT_SECRET;
+    writeFileSync(authFilePath, JSON.stringify(validAuthJson({ clientSecret: "file-secret" })));
+    process.env.REDDIT_CLIENT_SECRET = undefined;
     const tm = new TokenManager();
-    const settings = await tm.load();
-    expect(settings!.clientSecret).toBe("file-secret");
+    const settings = expectLoadedSettings(await tm.load());
+    expect(settings.clientSecret).toBe("file-secret");
   });
 
   test("throws on corrupted JSON", async () => {
@@ -193,12 +202,12 @@ describe("load", () => {
   test("allows empty username (valid edge case)", async () => {
     writeFileSync(authFilePath, JSON.stringify(validAuthJson({ username: "" })));
     const tm = new TokenManager();
-    const settings = await tm.load();
-    expect(settings!.username).toBe("");
+    const settings = expectLoadedSettings(await tm.load());
+    expect(settings.username).toBe("");
   });
 
   test("throws when no clientSecret in env or file", async () => {
-    delete process.env.REDDIT_CLIENT_SECRET;
+    process.env.REDDIT_CLIENT_SECRET = undefined;
     writeFileSync(authFilePath, JSON.stringify(validAuthJson()));
     const tm = new TokenManager();
     await expect(tm.load()).rejects.toThrow("REDDIT_CLIENT_SECRET");
@@ -281,9 +290,7 @@ describe("exchangeCode", () => {
     });
 
     const tm = new TokenManager();
-    await expect(tm.exchangeCode("code", "cid", "csecret")).rejects.toThrow(
-      "missing access_token",
-    );
+    await expect(tm.exchangeCode("code", "cid", "csecret")).rejects.toThrow("missing access_token");
   });
 
   test("throws on missing refresh_token in response", async () => {
@@ -310,8 +317,7 @@ describe("exchangeCode", () => {
 
   test("throws on expires_in <= 0", async () => {
     mockFetch({
-      token: () =>
-        Response.json({ access_token: "at", refresh_token: "rt", expires_in: 0 }),
+      token: () => Response.json({ access_token: "at", refresh_token: "rt", expires_in: 0 }),
     });
 
     const tm = new TokenManager();
@@ -465,8 +471,7 @@ describe("refreshAccessToken", () => {
   test("throws on expires_in <= 0 in refresh response", async () => {
     writeFileSync(authFilePath, JSON.stringify(validAuthJson({ tokenExpiry: Date.now() - 1000 })));
     mockFetch({
-      token: () =>
-        Response.json({ access_token: "new-at", expires_in: 0 }),
+      token: () => Response.json({ access_token: "new-at", expires_in: 0 }),
     });
 
     const tm = new TokenManager();
@@ -477,8 +482,7 @@ describe("refreshAccessToken", () => {
   test("throws on negative expires_in in refresh response", async () => {
     writeFileSync(authFilePath, JSON.stringify(validAuthJson({ tokenExpiry: Date.now() - 1000 })));
     mockFetch({
-      token: () =>
-        Response.json({ access_token: "new-at", expires_in: -100 }),
+      token: () => Response.json({ access_token: "new-at", expires_in: -100 }),
     });
 
     const tm = new TokenManager();
@@ -532,11 +536,11 @@ describe("refreshAccessToken", () => {
     // Manually set stale settings to trigger refresh path
     await tm.load();
     // Overwrite in-memory to simulate staleness
-    (tm as any).settings = {
+    setInternalSettings(tm, {
       ...tm.getSettings(),
       tokenExpiry: Date.now() - 1000,
       accessToken: "stale-token",
-    };
+    });
 
     // fetch should NOT be called — disk is fresh
     let fetchCalled = false;
@@ -559,7 +563,7 @@ describe("refreshAccessToken", () => {
     await tm.load();
 
     // Now remove env var — load() inside refresh will fail on clientSecret
-    delete process.env.REDDIT_CLIENT_SECRET;
+    process.env.REDDIT_CLIENT_SECRET = undefined;
 
     let capturedAuth = "";
     mockFetch({
@@ -657,10 +661,7 @@ describe("ensureValidToken", () => {
   });
 
   test("triggers refresh when token is already expired", async () => {
-    writeFileSync(
-      authFilePath,
-      JSON.stringify(validAuthJson({ tokenExpiry: Date.now() - 5000 })),
-    );
+    writeFileSync(authFilePath, JSON.stringify(validAuthJson({ tokenExpiry: Date.now() - 5000 })));
 
     mockFetch({
       token: () => Response.json({ access_token: "refreshed", expires_in: 3600 }),
@@ -672,10 +673,7 @@ describe("ensureValidToken", () => {
   });
 
   test("coalesces concurrent calls onto single refresh", async () => {
-    writeFileSync(
-      authFilePath,
-      JSON.stringify(validAuthJson({ tokenExpiry: Date.now() - 1000 })),
-    );
+    writeFileSync(authFilePath, JSON.stringify(validAuthJson({ tokenExpiry: Date.now() - 1000 })));
 
     let callCount = 0;
     mockFetch({
@@ -690,21 +688,14 @@ describe("ensureValidToken", () => {
     await tm.load();
 
     // Fire 3 concurrent ensureValidToken calls
-    await Promise.all([
-      tm.ensureValidToken(),
-      tm.ensureValidToken(),
-      tm.ensureValidToken(),
-    ]);
+    await Promise.all([tm.ensureValidToken(), tm.ensureValidToken(), tm.ensureValidToken()]);
 
     // Only one fetch should have been made
     expect(callCount).toBe(1);
   });
 
   test("coalesces concurrent failures and clears for retry", async () => {
-    writeFileSync(
-      authFilePath,
-      JSON.stringify(validAuthJson({ tokenExpiry: Date.now() - 1000 })),
-    );
+    writeFileSync(authFilePath, JSON.stringify(validAuthJson({ tokenExpiry: Date.now() - 1000 })));
 
     let callCount = 0;
     mockFetch({
@@ -721,10 +712,7 @@ describe("ensureValidToken", () => {
     await tm.load();
 
     // Both concurrent calls should see the same failure
-    const results = await Promise.allSettled([
-      tm.ensureValidToken(),
-      tm.ensureValidToken(),
-    ]);
+    const results = await Promise.allSettled([tm.ensureValidToken(), tm.ensureValidToken()]);
     expect(results[0].status).toBe("rejected");
     expect(results[1].status).toBe("rejected");
     // Only one fetch was made (coalesced)
@@ -953,8 +941,7 @@ describe("withLock (via refreshAccessToken)", () => {
 describe("save security", () => {
   test("auth.json is written with restricted permissions", async () => {
     mockFetch({
-      token: () =>
-        Response.json({ access_token: "at", refresh_token: "rt", expires_in: 3600 }),
+      token: () => Response.json({ access_token: "at", refresh_token: "rt", expires_in: 3600 }),
       me: () => Response.json({ name: "user" }),
     });
 
@@ -972,8 +959,7 @@ describe("save security", () => {
 
   test("auth.json is valid JSON with pretty formatting", async () => {
     mockFetch({
-      token: () =>
-        Response.json({ access_token: "at", refresh_token: "rt", expires_in: 3600 }),
+      token: () => Response.json({ access_token: "at", refresh_token: "rt", expires_in: 3600 }),
       me: () => Response.json({ name: "user" }),
     });
 
@@ -1024,10 +1010,7 @@ describe("fetch timeout protection", () => {
 
   test("refreshAccessToken passes AbortSignal.timeout to fetch", async () => {
     // Set up authenticated state
-    writeFileSync(
-      authFilePath,
-      JSON.stringify(validAuthJson({ tokenExpiry: Date.now() - 1000 })),
-    );
+    writeFileSync(authFilePath, JSON.stringify(validAuthJson({ tokenExpiry: Date.now() - 1000 })));
 
     let capturedSignal: AbortSignal | undefined;
     globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {

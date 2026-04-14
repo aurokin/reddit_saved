@@ -197,7 +197,7 @@ describe("detectOrphans", () => {
   });
 
   test("all origins saturated — no orphans detected, all skipped", () => {
-    const db = adapter["db"];
+    const db = adapter.db;
     const now = Date.now();
     const stmt = db.prepare(
       "INSERT INTO posts (id, name, kind, content_origin, author, subreddit, permalink, score, created_utc, fetched_at, updated_at, last_seen_at, raw_json, is_on_reddit) VALUES (?, ?, 't3', ?, 'u', 's', '/r/s/', 1, 1, ?, ?, ?, '{}', 1)",
@@ -223,7 +223,7 @@ describe("detectOrphans", () => {
   });
 
   test("mixed origins — only unsaturated origins are checked", () => {
-    const db = adapter["db"];
+    const db = adapter.db;
     const oldTime = Date.now() - 10000;
     const stmt = db.prepare(
       "INSERT INTO posts (id, name, kind, content_origin, author, subreddit, permalink, score, created_utc, fetched_at, updated_at, last_seen_at, raw_json, is_on_reddit) VALUES (?, ?, 't3', ?, 'u', 's', '/r/s/', 1, 1, ?, ?, ?, '{}', 1)",

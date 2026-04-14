@@ -140,7 +140,13 @@ export async function tagAdd(
   }
 
   const toFlag = flags.to;
-  const toIds = typeof toFlag === "string" ? toFlag.split(",").map((s) => s.trim()).filter(Boolean) : [];
+  const toIds =
+    typeof toFlag === "string"
+      ? toFlag
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
   const postIds = [...toIds, ...positionals.slice(1)];
 
   if (postIds.length === 0) {
@@ -190,7 +196,13 @@ export async function tagRemove(
   }
 
   const fromFlag = flags.from;
-  const fromIds = typeof fromFlag === "string" ? fromFlag.split(",").map((s) => s.trim()).filter(Boolean) : [];
+  const fromIds =
+    typeof fromFlag === "string"
+      ? fromFlag
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
   const postIds = [...fromIds, ...positionals.slice(1)];
 
   if (postIds.length === 0) {

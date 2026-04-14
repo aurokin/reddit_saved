@@ -66,4 +66,3 @@ export async function listCmd(
     ctx.close();
   }
 }
-

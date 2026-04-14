@@ -374,6 +374,10 @@ export class SqliteAdapter implements StorageAdapter {
     );
   }
 
+  deleteSyncState(key: string): void {
+    this.db.run("DELETE FROM sync_state WHERE key = ?", [key]);
+  }
+
   // --------------------------------------------------------------------------
   // Unsave
   // --------------------------------------------------------------------------

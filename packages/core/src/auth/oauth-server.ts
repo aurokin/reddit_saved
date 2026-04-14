@@ -107,103 +107,110 @@ export async function startOAuthServer(options: OAuthServerOptions): Promise<OAu
     reject(err);
   }, OAUTH_TIMEOUT_MS);
 
-  const server = Bun.serve({
-    port,
-    hostname,
-    async fetch(req) {
-      const url = new URL(req.url);
+  let server: ReturnType<typeof Bun.serve>;
+  try {
+    server = Bun.serve({
+      port,
+      hostname,
+      async fetch(req) {
+        const url = new URL(req.url);
 
-      if (url.pathname !== "/callback") {
-        return new Response("Not found", { status: 404 });
-      }
+        if (url.pathname !== "/callback") {
+          return new Response("Not found", { status: 404 });
+        }
 
-      // Guard against duplicate /callback hits (browser retry, double-click)
-      if (settled) {
-        return new Response(
-          errorPage(
-            "Authorization already handled. Please close this tab and try again if needed.",
-          ),
-          {
-            status: 400,
+        // Guard against duplicate /callback hits (browser retry, double-click)
+        if (settled) {
+          return new Response(
+            errorPage(
+              "Authorization already handled. Please close this tab and try again if needed.",
+            ),
+            {
+              status: 400,
+              headers: { "Content-Type": "text/html" },
+            },
+          );
+        }
+
+        const code = url.searchParams.get("code");
+        const state = url.searchParams.get("state");
+        const error = url.searchParams.get("error");
+
+        if (error) {
+          settled = true;
+          clearTimeout(timeout);
+          const truncatedError = error.slice(0, 256);
+          const err = new Error(`Reddit authorization denied: ${truncatedError}`);
+          options.onError?.(err);
+          reject(err);
+          const response = new Response(errorPage(truncatedError), {
             headers: { "Content-Type": "text/html" },
-          },
-        );
-      }
+          });
+          setTimeout(() => server.stop(false), 500);
+          return response;
+        }
 
-      const code = url.searchParams.get("code");
-      const state = url.searchParams.get("state");
-      const error = url.searchParams.get("error");
-
-      if (error) {
-        settled = true;
-        clearTimeout(timeout);
-        const truncatedError = error.slice(0, 256);
-        const err = new Error(`Reddit authorization denied: ${truncatedError}`);
-        options.onError?.(err);
-        reject(err);
-        const response = new Response(errorPage(truncatedError), {
-          headers: { "Content-Type": "text/html" },
-        });
-        setTimeout(() => server.stop(false), 500);
-        return response;
-      }
-
-      if (!code || !state) {
-        return new Response(errorPage("Missing authorization code or state parameter."), {
-          status: 400,
-          headers: { "Content-Type": "text/html" },
-        });
-      }
-
-      const validState = validateState(state, pendingStates);
-      if (!validState) {
-        return new Response(errorPage("Invalid or expired authorization state."), {
-          status: 400,
-          headers: { "Content-Type": "text/html" },
-        });
-      }
-
-      // Claim the slot before any async work to prevent double token exchange
-      settled = true;
-      clearTimeout(timeout);
-
-      try {
-        const settings = await tokenManager.exchangeCode(
-          code,
-          options.clientId,
-          options.clientSecret,
-          validState.codeVerifier,
-          redirectUri,
-        );
-
-        // Construct response before resolving — prevents teardown-before-redirect races
-        let response: Response;
-        if (validState.returnTo) {
-          response = Response.redirect(validState.returnTo, 302);
-        } else {
-          response = new Response(successPage(settings.username), {
+        if (!code || !state) {
+          return new Response(errorPage("Missing authorization code or state parameter."), {
+            status: 400,
             headers: { "Content-Type": "text/html" },
           });
         }
 
-        setTimeout(() => server.stop(false), 500);
-        options.onSuccess?.(settings.username);
-        resolve();
-        return response;
-      } catch (err) {
-        const authError = err instanceof Error ? err : new Error(String(err));
-        options.onError?.(authError);
-        reject(authError);
-        // Show generic message in browser; keep detail in the thrown error
-        const response = new Response(errorPage("Authentication failed. Please try again."), {
-          status: 500,
-          headers: { "Content-Type": "text/html" },
-        });
-        setTimeout(() => server.stop(false), 500);
-        return response;
-      }
-    },
-  });
+        const validState = validateState(state, pendingStates);
+        if (!validState) {
+          return new Response(errorPage("Invalid or expired authorization state."), {
+            status: 400,
+            headers: { "Content-Type": "text/html" },
+          });
+        }
+
+        // Claim the slot before any async work to prevent double token exchange
+        settled = true;
+        clearTimeout(timeout);
+
+        try {
+          const settings = await tokenManager.exchangeCode(
+            code,
+            options.clientId,
+            options.clientSecret,
+            validState.codeVerifier,
+            redirectUri,
+          );
+
+          // Construct response before resolving — prevents teardown-before-redirect races
+          let response: Response;
+          if (validState.returnTo) {
+            response = Response.redirect(validState.returnTo, 302);
+          } else {
+            response = new Response(successPage(settings.username), {
+              headers: { "Content-Type": "text/html" },
+            });
+          }
+
+          setTimeout(() => server.stop(false), 500);
+          options.onSuccess?.(settings.username);
+          resolve();
+          return response;
+        } catch (err) {
+          const authError = err instanceof Error ? err : new Error(String(err));
+          options.onError?.(authError);
+          reject(authError);
+          // Show generic message in browser; keep detail in the thrown error
+          const response = new Response(errorPage("Authentication failed. Please try again."), {
+            status: 500,
+            headers: { "Content-Type": "text/html" },
+          });
+          setTimeout(() => server.stop(false), 500);
+          return response;
+        }
+      },
+    });
+  } catch (err) {
+    clearTimeout(timeout);
+    pendingStates.clear();
+    throw err;
+  }
 
   options.onAuthorizeUrl?.(authorizeUrl);
 

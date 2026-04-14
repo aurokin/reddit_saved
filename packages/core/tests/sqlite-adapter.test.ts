@@ -164,13 +164,13 @@ describe("SqliteAdapter", () => {
   });
 
   test("sync state get/set", () => {
-    expect(adapter.getSyncState("last_cursor")).toBeNull();
-    adapter.setSyncState("last_cursor", "t3_abc123");
-    expect(adapter.getSyncState("last_cursor")).toBe("t3_abc123");
+    expect(adapter.getSyncState("sync_key")).toBeNull();
+    adapter.setSyncState("sync_key", "t3_abc123");
+    expect(adapter.getSyncState("sync_key")).toBe("t3_abc123");
 
     // Update
-    adapter.setSyncState("last_cursor", "t3_def456");
-    expect(adapter.getSyncState("last_cursor")).toBe("t3_def456");
+    adapter.setSyncState("sync_key", "t3_def456");
+    expect(adapter.getSyncState("sync_key")).toBe("t3_def456");
   });
 
   test("orphaned posts excluded from list by default", () => {
@@ -468,19 +468,13 @@ describe("SqliteAdapter", () => {
   });
 
   test("searchPosts preserves hyphens and apostrophes", () => {
-    adapter.upsertPosts(
-      [makeItem({ id: "a", title: "machine-learning is great" })],
-      "saved",
-    );
+    adapter.upsertPosts([makeItem({ id: "a", title: "machine-learning is great" })], "saved");
     const results = adapter.searchPosts("machine-learning", {});
     expect(results.length).toBe(1);
   });
 
   test("rebuildFtsIndex does not corrupt search", () => {
-    adapter.upsertPosts(
-      [makeItem({ id: "a", title: "unique keyword" })],
-      "saved",
-    );
+    adapter.upsertPosts([makeItem({ id: "a", title: "unique keyword" })], "saved");
     adapter.rebuildFtsIndex();
     const results = adapter.searchPosts("unique", {});
     expect(results.length).toBe(1);
@@ -509,10 +503,7 @@ describe("SqliteAdapter", () => {
 
   test("rebuildFtsIndex recovers from emptied FTS index", () => {
     // Insert data and verify search works
-    adapter.upsertPosts(
-      [makeItem({ id: "fts1", title: "Unique FTS rebuild keyword" })],
-      "saved",
-    );
+    adapter.upsertPosts([makeItem({ id: "fts1", title: "Unique FTS rebuild keyword" })], "saved");
     expect(adapter.searchPosts("Unique", {}).length).toBe(1);
 
     // Simulate FTS corruption: clear the FTS index directly
@@ -531,10 +522,7 @@ describe("SqliteAdapter", () => {
     // Insert data
     const path2 = makeTempDb();
     const adapter1 = new SqliteAdapter(path2);
-    adapter1.upsertPosts(
-      [makeItem({ id: "tr1", title: "Trigger rebuild test" })],
-      "saved",
-    );
+    adapter1.upsertPosts([makeItem({ id: "tr1", title: "Trigger rebuild test" })], "saved");
     expect(adapter1.searchPosts("Trigger", {}).length).toBe(1);
 
     // Drop triggers to simulate crash during bulk upsert

@@ -285,7 +285,11 @@ export class RequestQueue {
       // exits early (e.g., two close-together callbacks racing on isProcessing),
       // schedule another drain attempt. Uses setTimeout(0) instead of queueMicrotask
       // to yield to pending macrotasks (backoff timers, circuit breaker resets).
-      if (this.queue.length > 0 && !this.isPaused && this.activeRequests < this.config.maxConcurrent) {
+      if (
+        this.queue.length > 0 &&
+        !this.isPaused &&
+        this.activeRequests < this.config.maxConcurrent
+      ) {
         setTimeout(() => this.processQueue(), 0);
       }
     }

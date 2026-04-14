@@ -3,7 +3,14 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { SqliteAdapter } from "@reddit-saved/core";
 import { setOutputMode } from "../src/output";
-import { captureConsole, captureExit, ExitCaptured, makeItem, makeTempDb, restoreFetch } from "./helpers";
+import {
+  ExitCaptured,
+  captureConsole,
+  captureExit,
+  makeItem,
+  makeTempDb,
+  restoreFetch,
+} from "./helpers";
 
 describe("unsave command", () => {
   let dbPath: string;
@@ -156,6 +163,72 @@ describe("unsave command", () => {
       cap.restore();
     }
   });
+
+  test("rejects mixing --id selectors with filter selectors", async () => {
+    adapter.upsertPosts([makeItem({ id: "p1", subreddit: "rust" })], "saved");
+    adapter.close();
+
+    const { unsaveCmd } = await import("../src/commands/unsave");
+    const cap = captureConsole();
+    const exit = captureExit();
+    try {
+      await unsaveCmd({ db: dbPath, "dry-run": true, id: "p1", subreddit: "rust" }, []);
+    } catch (e) {
+      expect(e).toBeInstanceOf(ExitCaptured);
+    } finally {
+      exit.restore();
+      cap.restore();
+    }
+
+    expect(exit.exitCode).toBe(1);
+    expect(cap.errors.some((e) => e.includes("either --id selectors or filter selectors"))).toBe(
+      true,
+    );
+  });
+
+  test("rejects non-positive --limit for filter-based unsave", async () => {
+    adapter.upsertPosts([makeItem({ id: "p1", subreddit: "rust" })], "saved");
+    adapter.close();
+
+    const { unsaveCmd } = await import("../src/commands/unsave");
+    const cap = captureConsole();
+    const exit = captureExit();
+    try {
+      await unsaveCmd({ db: dbPath, "dry-run": true, subreddit: "rust", limit: "-1" }, []);
+    } catch (e) {
+      expect(e).toBeInstanceOf(ExitCaptured);
+    } finally {
+      exit.restore();
+      cap.restore();
+    }
+
+    expect(exit.exitCode).toBe(1);
+    expect(cap.errors.some((e) => e.includes("--limit must be a positive integer"))).toBe(true);
+  });
+
+  test("--dry-run supports additional IDs as positionals after --id", async () => {
+    adapter.upsertPosts(
+      [
+        makeItem({ id: "p1", title: "Post 1", subreddit: "test" }),
+        makeItem({ id: "p2", title: "Post 2", subreddit: "test" }),
+        makeItem({ id: "p3", title: "Post 3", subreddit: "test" }),
+      ],
+      "saved",
+    );
+    adapter.close();
+
+    const { unsaveCmd } = await import("../src/commands/unsave");
+    const cap = captureConsole();
+    try {
+      await unsaveCmd({ db: dbPath, "dry-run": true, id: "p1,p2" }, ["p3"]);
+      const output = JSON.parse(cap.logs[0]);
+      expect(output.dryRun).toBe(true);
+      expect(output.count).toBe(3);
+      expect(output.ids).toEqual(["p1", "p2", "p3"]);
+    } finally {
+      cap.restore();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -213,10 +286,7 @@ describe("unsave command — API path", () => {
     // Seed DB
     const adapter = new SqliteAdapter(dbPath);
     adapter.upsertPosts(
-      [
-        makeItem({ id: "p1", title: "Post 1" }),
-        makeItem({ id: "p2", title: "Post 2" }),
-      ],
+      [makeItem({ id: "p1", title: "Post 1" }), makeItem({ id: "p2", title: "Post 2" })],
       "saved",
     );
     adapter.close();
@@ -269,10 +339,7 @@ describe("unsave command — API path", () => {
   test("--confirm with partial API failure reports counts", async () => {
     const adapter = new SqliteAdapter(dbPath);
     adapter.upsertPosts(
-      [
-        makeItem({ id: "p1", title: "Will succeed" }),
-        makeItem({ id: "p2", title: "Will fail" }),
-      ],
+      [makeItem({ id: "p1", title: "Will succeed" }), makeItem({ id: "p2", title: "Will fail" })],
       "saved",
     );
     adapter.close();

@@ -182,14 +182,15 @@ CREATE INDEX idx_post_tags_tag ON post_tags(tag_id);
 
 -- Sync state tracking
 CREATE TABLE sync_state (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL);
--- Keys used today: last_cursor, last_sync_time, last_full_sync_time
+-- Keys used today: last_cursor_saved, last_cursor_upvoted, last_cursor_submitted,
+-- last_cursor_commented, last_sync_time, last_full_sync_time
 
 CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL);
 ```
 
 ### Sync & removal detection
 
-- **Incremental sync** (`reddit-saved fetch`): Uses cursor-based pagination (`after` param). New items are inserted, existing items are updated (score, num_comments, etc.). `last_seen_at` is updated for every item seen.
+- **Incremental sync** (`reddit-saved fetch`): Uses cursor-based pagination (`after` param). New items are inserted, existing items are updated (score, num_comments, etc.). `last_seen_at` is updated for every item seen. The CLI persists one resume cursor per origin (`saved`, `upvoted`, `submitted`, `commented`) so a later rerun can continue where the prior incremental fetch stopped. In-progress checkpoint files still take precedence for crash recovery mid-run.
 - **Full sync** (`reddit-saved fetch --full`): Fetches all saved items from Reddit. Orphan detection runs **only if local item count < 1000**. If >=1000 items exist locally, orphan detection is skipped and a warning is printed: "Reddit's API limits results to 1000 items. Orphan detection skipped — older items beyond this window cannot be verified." When orphan detection runs: any local item whose `last_seen_at` is older than the sync start time is marked `is_on_reddit = 0`. These items remain searchable — never deleted automatically.
 - **User can choose**: `reddit-saved status` shows orphaned count. `reddit-saved search --orphaned` finds them. They keep their tags and remain in FTS.
 
@@ -268,7 +269,7 @@ CLI implements these to write progress to stderr. The planned web layer can reus
 ### Sync state vs sync_state table
 
 These serve different purposes:
-- **`sync_state` SQL table**: Stores completed-sync metadata (key-value pairs like `last_cursor`, `last_sync_time`, `last_full_sync_time`). Persistent across sessions. Managed via `StorageAdapter.getSyncState/setSyncState`.
+- **`sync_state` SQL table**: Stores completed-sync metadata (key-value pairs like `last_cursor_saved`, `last_cursor_upvoted`, `last_cursor_submitted`, `last_cursor_commented`, `last_sync_time`, `last_full_sync_time`). Persistent across sessions. Managed via `StorageAdapter.getSyncState/setSyncState/deleteSyncState`.
 - **`sync/state-manager.ts`**: Stores in-flight checkpoint data for crash recovery during a fetch (pending item IDs, failed items, current phase). Ported from `ImportStateManager`. Written to a JSON file (`.reddit-import-checkpoint.json` in data dir). **Deleted on successful completion** — only exists while a fetch is in progress.
 
 ### User-Agent
@@ -352,7 +353,9 @@ LIMIT ? OFFSET ?;
 
 ### Content origin and deduplication
 
-A post can appear in multiple endpoints (e.g., saved AND upvoted). The `content_origin` column tracks how the item was *first* fetched. If the same item appears via a different `--type` fetch, we update metadata (score, etc.) but **do not overwrite** `content_origin` — the upsert SQL omits `content_origin` from the `ON CONFLICT ... DO UPDATE SET` clause, preserving the original value. The `raw_json` is always updated to the latest version. Future: could add a `content_origins` junction table if multi-origin tracking becomes important.
+A post can appear in multiple endpoints (e.g., saved AND upvoted). The `content_origin` column tracks how the item was *first* fetched. If the same item appears via a different `--type` fetch, we update metadata (score, etc.) but **do not overwrite** `content_origin` — the upsert SQL omits `content_origin` from the `ON CONFLICT ... DO UPDATE SET` clause, preserving the original value. The `raw_json` is always updated to the latest version.
+
+This is an intentional Phase 3 simplification, but it has an important consequence: origin-scoped stats and orphan detection are exact only for the first-seen origin. If an item is first fetched via `saved` and later appears in `upvoted`, a full `--type upvoted --full` sync will refresh the row's metadata and `last_seen_at`, but the row will still count as `saved` for `activeCountByOrigin` and for origin-scoped orphan cleanup. Future: add a `content_origins` junction table (or equivalent multi-origin membership model) if origin-accurate sync accounting becomes important.
 
 ### FTS bulk insert strategy
 
@@ -522,7 +525,7 @@ Exit codes: 0=success, 1=error, 2=auth required
 5. Port monitor/performance.ts
 6. Tests
 
-### Phase 3: CLI (Implemented, under review)
+### Phase 3: CLI (Complete)
 1. Entry point, arg parser (hand-rolled, handles nested subcommands), output formatters
 2. `auth login/status/logout` (login uses core oauth-server)
 3. `fetch` + `search` + `list` + `status` (search/list support --tag, --orphaned, --author)
@@ -546,7 +549,8 @@ Exit codes: 0=success, 1=error, 2=auth required
 
 ## Known Limitations & Future Work
 - **Reddit 1000-item API cap**: Reddit's listing endpoints return max 1000 items. Users with >1000 saves will only get the newest 1000 via the API. Orphan detection is disabled when local count >= 1000 to avoid false positives. Future: investigate GDPR data export (used by Reddit-Saved-Post-Extractor) as a bypass for initial import.
-- **Single redirect URI**: One Reddit app, one callback at localhost:9638. Both CLI and web share it. If both start an OAuth flow simultaneously, port conflict occurs — document this. Token refresh is safe via file-lock.
+- **Single redirect URI**: One Reddit app, one callback at localhost:9638. Both CLI and web share it. If both start an OAuth flow simultaneously, one flow will fail with a clear "port already in use" error. Token refresh is safe via file-lock.
+- **Single-origin storage model**: `posts.content_origin` records only the first endpoint that introduced an item. This keeps the schema simple for Phase 3, but multi-origin items are not counted independently per origin and origin-scoped orphan detection is conservative for later-seen origins. Future: add a `content_origins` membership table if we need exact per-origin accounting.
 - **No backup**: SQLite DB backup is not implemented. Users can manually copy the DB file. May add `reddit-saved backup` in the future.
 - **CLI arg parsing complexity**: Zero npm deps means hand-rolled arg parser. Nested subcommands (`tag create`, `tag add`) are non-trivial — acknowledge implementation effort in Phase 3.
 - **FTS crash recovery**: If the process crashes between dropping triggers and rebuilding the FTS index, the index may be stale. Mitigated by startup trigger/integrity checks that rebuild only when needed.

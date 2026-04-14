@@ -3,6 +3,13 @@ import { flagStr } from "../args";
 import { createContext } from "../context";
 import { isHumanMode, printJson, printSection } from "../output";
 
+const CURSOR_KEYS = {
+  saved: "last_cursor_saved",
+  upvoted: "last_cursor_upvoted",
+  submitted: "last_cursor_submitted",
+  comments: "last_cursor_commented",
+} as const;
+
 export async function statusCmd(
   flags: Record<string, string | boolean>,
   _positionals: string[],
@@ -12,6 +19,13 @@ export async function statusCmd(
   try {
     const stats = ctx.storage.getStats();
     const tags = ctx.tags.listTags();
+    const resumeCursors = Object.fromEntries(
+      Object.entries(CURSOR_KEYS)
+        .map(([origin, key]) => [origin, ctx.storage.getSyncState(key)])
+        .filter(
+          (entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].length > 0,
+        ),
+    );
 
     if (isHumanMode()) {
       printSection("Database", [
@@ -45,9 +59,20 @@ export async function statusCmd(
         );
       }
 
+      const resumeEntries: Array<[string, unknown]> = Object.entries(resumeCursors).map(
+        ([origin, cursor]) => [origin, cursor],
+      );
+      if (resumeEntries.length > 0) {
+        printSection("Resume Cursors", resumeEntries);
+      }
+
       console.log();
     } else {
-      printJson({ ...stats, tags });
+      printJson({
+        ...stats,
+        tags,
+        ...(Object.keys(resumeCursors).length > 0 ? { resumeCursors } : {}),
+      });
     }
   } finally {
     ctx.close();

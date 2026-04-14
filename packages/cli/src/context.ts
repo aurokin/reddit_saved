@@ -7,6 +7,7 @@
 
 import {
   type ApiClientCallbacks,
+  type AuthSettings,
   PerformanceMonitor,
   RedditApiClient,
   RequestQueue,
@@ -46,7 +47,7 @@ export async function createContext(opts: ContextOptions = {}): Promise<CliConte
   const needsAuth = opts.needsAuth || opts.needsApi;
 
   if (needsAuth) {
-    let settings;
+    let settings: AuthSettings | null;
     try {
       settings = await tokenManager.load();
     } catch (err) {

@@ -54,11 +54,14 @@ const SAFE_LITERAL_ALTERNATION = /^\(([a-zA-Z0-9_]+\|)*[a-zA-Z0-9_]+\)[+*]$/;
  */
 function hasUnsafeAlternation(pattern: string): boolean {
   const groupRegex = /\([^)]*\|[^)]*\)[+*]/g;
-  let match;
-  while ((match = groupRegex.exec(pattern)) !== null) {
+  let match: RegExpExecArray | null = groupRegex.exec(pattern);
+  while (match !== null) {
     const group = match[0];
     // Plain literal alternatives are always safe (e.g. (a|b)+, (foo|bar)*)
-    if (SAFE_LITERAL_ALTERNATION.test(group)) continue;
+    if (SAFE_LITERAL_ALTERNATION.test(group)) {
+      match = groupRegex.exec(pattern);
+      continue;
+    }
     return true;
   }
   return false;

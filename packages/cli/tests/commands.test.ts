@@ -3,7 +3,7 @@ import { rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { SqliteAdapter, TagManager } from "@reddit-saved/core";
 import { setOutputMode } from "../src/output";
-import { captureConsole, captureExit, ExitCaptured, makeItem, makeTempDb } from "./helpers";
+import { ExitCaptured, captureConsole, captureExit, makeItem, makeTempDb } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -65,6 +65,28 @@ describe("search command", () => {
       const results = JSON.parse(cap.logs[0]);
       expect(results.length).toBe(1);
       expect(results[0].subreddit).toBe("rust");
+    } finally {
+      cap.restore();
+    }
+  });
+
+  test("search joins multiple positional terms into one query", async () => {
+    adapter.upsertPosts(
+      [
+        makeItem({ id: "p1", title: "Rust programming language", subreddit: "rust" }),
+        makeItem({ id: "p2", title: "Rust only", subreddit: "rust" }),
+      ],
+      "saved",
+    );
+    adapter.close();
+
+    const { searchCmd } = await import("../src/commands/search");
+    const cap = captureConsole();
+    try {
+      await searchCmd({ db: dbPath }, ["Rust", "programming"]);
+      const results = JSON.parse(cap.logs[0]);
+      expect(results.length).toBe(1);
+      expect(results[0].id).toBe("p1");
     } finally {
       cap.restore();
     }
@@ -157,6 +179,25 @@ describe("status command", () => {
       expect(stats.totalPosts).toBe(2);
       expect(stats.totalComments).toBe(0);
       expect(stats.tags).toEqual([]);
+    } finally {
+      cap.restore();
+    }
+  });
+
+  test("status includes resume cursors when present", async () => {
+    adapter.setSyncState("last_cursor_saved", "saved_cursor_111");
+    adapter.setSyncState("last_cursor_commented", "comments_cursor_333");
+    adapter.close();
+
+    const { statusCmd } = await import("../src/commands/status");
+    const cap = captureConsole();
+    try {
+      await statusCmd({ db: dbPath });
+      const stats = JSON.parse(cap.logs[0]);
+      expect(stats.resumeCursors).toEqual({
+        saved: "saved_cursor_111",
+        comments: "comments_cursor_333",
+      });
     } finally {
       cap.restore();
     }
@@ -978,6 +1019,23 @@ describe("human mode output", () => {
       expect(allOutput).toContain("Top Subreddits");
       expect(allOutput).toContain("rust");
       expect(allOutput).toContain("python");
+    } finally {
+      cap.restore();
+    }
+  });
+
+  test("status in human mode shows resume cursors when present", async () => {
+    adapter.setSyncState("last_cursor_commented", "comments_cursor_333");
+    adapter.close();
+
+    const { statusCmd } = await import("../src/commands/status");
+    const cap = captureConsole();
+    try {
+      await statusCmd({ db: dbPath }, []);
+      const allOutput = cap.logs.join("\n");
+      expect(allOutput).toContain("Resume Cursors");
+      expect(allOutput).toContain("comments");
+      expect(allOutput).toContain("comments_cursor_333");
     } finally {
       cap.restore();
     }

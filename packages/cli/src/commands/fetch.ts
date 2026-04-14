@@ -1,5 +1,6 @@
 import { dirname, join } from "node:path";
 import {
+  type CheckpointData,
   type ContentOrigin,
   type FetchOptions,
   type OrphanDetectionResult,
@@ -29,6 +30,31 @@ import {
 
 const VALID_TYPES = new Set(["saved", "upvoted", "submitted", "comments"]);
 
+interface SyncStateStore {
+  getSyncState(key: string): string | null;
+  deleteSyncState(key: string): void;
+}
+
+function getCursorKey(origin: ContentOrigin): string {
+  return `last_cursor_${origin}`;
+}
+
+function getStoredIncrementalCursor(storage: SyncStateStore, origin: ContentOrigin): string | null {
+  return storage.getSyncState(getCursorKey(origin));
+}
+
+function clearStoredIncrementalCursor(storage: SyncStateStore, origin: ContentOrigin): void {
+  storage.deleteSyncState(getCursorKey(origin));
+}
+
+function isCheckpointCompatible(
+  checkpoint: CheckpointData,
+  contentOrigin: ContentOrigin,
+  isFull: boolean,
+): boolean {
+  return checkpoint.contentOrigin === contentOrigin && checkpoint.isFull === isFull;
+}
+
 export async function fetchCmd(
   flags: Record<string, string | boolean>,
   _positionals: string[],
@@ -52,18 +78,35 @@ export async function fetchCmd(
       ? join(dirname(dbPath), ".reddit-import-checkpoint.json")
       : undefined;
     const stateManager = new SyncStateManager(checkpointPath);
-    const existingCheckpoint = await stateManager.load();
+    const loadedCheckpoint = await stateManager.load();
 
     // Build fetch options
     const fetchOpts: FetchOptions = { limit };
 
-    // Resume from checkpoint if available
-    if (existingCheckpoint?.cursor) {
-      printInfo(
-        `Found checkpoint from ${new Date(existingCheckpoint.startedAt).toLocaleString()}. ` +
-          `Resuming from item ${existingCheckpoint.totalFetched}.`,
+    let checkpoint = loadedCheckpoint;
+
+    if (checkpoint && !isCheckpointCompatible(checkpoint, contentOrigin, isFull)) {
+      printWarning(
+        `Ignoring checkpoint for ${checkpoint.isFull ? "full" : "incremental"} ${checkpoint.contentOrigin} fetch while running ${isFull ? "full" : "incremental"} ${contentOrigin}.`,
       );
-      fetchOpts.startCursor = existingCheckpoint.cursor;
+      checkpoint = null;
+    }
+
+    // Resume from checkpoint if available
+    let storedCursor: string | null = null;
+
+    if (checkpoint?.cursor) {
+      printInfo(
+        `Found checkpoint from ${new Date(checkpoint.startedAt).toLocaleString()}. ` +
+          `Resuming from item ${checkpoint.totalFetched}.`,
+      );
+      fetchOpts.startCursor = checkpoint.cursor;
+    } else if (!isFull) {
+      storedCursor = getStoredIncrementalCursor(ctx.storage, contentOrigin);
+      if (storedCursor) {
+        printInfo(`Resuming incremental ${typeStr} fetch from the last stored cursor.`);
+        fetchOpts.startCursor = storedCursor;
+      }
     }
 
     // Start performance monitoring
@@ -71,8 +114,12 @@ export async function fetchCmd(
     const syncStartTime = Date.now();
 
     // Create checkpoint
-    const checkpoint = existingCheckpoint ?? stateManager.createNew();
+    checkpoint ??= stateManager.createNew(undefined, { contentOrigin, isFull });
+    checkpoint.contentOrigin = contentOrigin;
+    checkpoint.isFull = isFull;
+    checkpoint.cursor = fetchOpts.startCursor ?? checkpoint.cursor;
     checkpoint.phase = "fetching";
+    await stateManager.save(checkpoint);
 
     // Pick the right fetch method — apiClient is guaranteed non-null by needsApi: true
     const api = ctx.apiClient as NonNullable<typeof ctx.apiClient>;
@@ -107,13 +154,54 @@ export async function fetchCmd(
     checkpoint.totalFetched += result.items.length;
     await stateManager.save(checkpoint);
 
+    if (result.wasErrored || result.wasCancelled) {
+      if (!isFull && result.cursor) {
+        ctx.storage.setSyncState(getCursorKey(contentOrigin), result.cursor);
+      }
+
+      ctx.monitor.endSession();
+      const summary = ctx.monitor.getSummary();
+      const incompleteReason = result.wasCancelled ? "cancelled" : "errored";
+
+      printWarning(
+        `Fetch ${incompleteReason} before completion. Resume state was preserved; sync timestamps were not updated.`,
+      );
+
+      const output = {
+        type: typeStr,
+        fetched: result.items.length,
+        stored: result.items.length,
+        hasMore: result.hasMore,
+        duration: formatDuration(summary.durationMs),
+        ...(result.wasCancelled ? { cancelled: true } : {}),
+        ...(result.wasErrored ? { errored: true } : {}),
+      };
+
+      if (isHumanMode()) {
+        printSection("Fetch Incomplete", [
+          ["Type", typeStr],
+          ["Fetched", result.items.length],
+          ["Stored", result.items.length],
+          ["Duration", formatDuration(summary.durationMs)],
+          ["Status", incompleteReason],
+          ["Resume preserved", "yes"],
+        ]);
+        console.log();
+      } else {
+        printJson(output);
+      }
+      return;
+    }
+
     // Update sync state
     ctx.storage.setSyncState("last_sync_time", String(syncStartTime));
     if (isFull) {
       ctx.storage.setSyncState("last_full_sync_time", String(syncStartTime));
     }
-    if (result.cursor) {
-      ctx.storage.setSyncState("last_cursor", result.cursor);
+    if (!isFull && result.hasMore && result.cursor) {
+      ctx.storage.setSyncState(getCursorKey(contentOrigin), result.cursor);
+    } else {
+      clearStoredIncrementalCursor(ctx.storage, contentOrigin);
     }
 
     // Orphan detection on full sync

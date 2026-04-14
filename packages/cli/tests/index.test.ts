@@ -31,6 +31,7 @@ describe("CLI entry point", () => {
     expect(output).toContain("Commands:");
     expect(output).toContain("auth login");
     expect(output).toContain("tag create");
+    expect(output).toContain("Fetch Reddit content into the local cache");
   });
 
   test("no command prints usage text", async () => {

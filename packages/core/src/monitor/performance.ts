@@ -360,7 +360,7 @@ function createEmptyRequestMetrics(): RequestMetrics {
     rateLimitedRequests: 0,
     totalBytesDownloaded: 0,
     avgResponseTimeMs: 0,
-    minResponseTimeMs: Infinity,
+    minResponseTimeMs: Number.POSITIVE_INFINITY,
     maxResponseTimeMs: 0,
     rateLimitWaitTimeMs: 0,
     requestTimestamps: [],

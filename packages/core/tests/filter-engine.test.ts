@@ -27,6 +27,10 @@ function makeSettings(overrides: Partial<FilterSettings> = {}): FilterSettings {
   return { ...DEFAULT_FILTER_SETTINGS, enabled: true, ...overrides };
 }
 
+function determinePostTypeForUrl(url: string) {
+  return FilterEngine.determinePostType(makeItem({ url }).data);
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -91,7 +95,9 @@ describe("FilterEngine", () => {
       const textResult = engine.shouldIncludeItem(makeItem({ is_self: true }));
       expect(textResult.passes).toBe(false);
       // A link post should also be excluded
-      const linkResult = engine.shouldIncludeItem(makeItem({ is_self: false, url: "https://example.com" }));
+      const linkResult = engine.shouldIncludeItem(
+        makeItem({ is_self: false, url: "https://example.com" }),
+      );
       expect(linkResult.passes).toBe(false);
     });
   });
@@ -575,9 +581,7 @@ describe("FilterEngine", () => {
     });
 
     test("breakdown counts filter types correctly", () => {
-      const engine = new FilterEngine(
-        makeSettings({ minScore: 100, excludeNsfw: true }),
-      );
+      const engine = new FilterEngine(makeSettings({ minScore: 100, excludeNsfw: true }));
       const items = [
         makeItem({ id: "ok", score: 200, over_18: false }),
         makeItem({ id: "lowscore", score: 5, over_18: false }),
@@ -740,7 +744,6 @@ describe("FilterEngine", () => {
   });
 
   describe("ReDoS protection — isSafeRegex", () => {
-
     test("rejects nested quantifiers (a+)+", () => {
       expect(isSafeRegex("(a+)+")).toBe(false);
     });
@@ -864,65 +867,45 @@ describe("FilterEngine", () => {
 
   describe("video detection patterns", () => {
     test("youtu.be detected as video", () => {
-      expect(FilterEngine.determinePostType({ url: "https://youtu.be/abc123" } as any)).toBe(
-        "video",
-      );
+      expect(determinePostTypeForUrl("https://youtu.be/abc123")).toBe("video");
     });
 
     test("vimeo.com detected as video", () => {
-      expect(FilterEngine.determinePostType({ url: "https://vimeo.com/123" } as any)).toBe(
-        "video",
-      );
+      expect(determinePostTypeForUrl("https://vimeo.com/123")).toBe("video");
     });
 
     test(".mp4 URL detected as video", () => {
-      expect(
-        FilterEngine.determinePostType({ url: "https://example.com/video.mp4" } as any),
-      ).toBe("video");
+      expect(determinePostTypeForUrl("https://example.com/video.mp4")).toBe("video");
     });
 
     test(".webm URL detected as video", () => {
-      expect(
-        FilterEngine.determinePostType({ url: "https://example.com/clip.webm" } as any),
-      ).toBe("video");
+      expect(determinePostTypeForUrl("https://example.com/clip.webm")).toBe("video");
     });
 
     test(".mov URL detected as video", () => {
-      expect(
-        FilterEngine.determinePostType({ url: "https://example.com/movie.mov?t=10" } as any),
-      ).toBe("video");
+      expect(determinePostTypeForUrl("https://example.com/movie.mov?t=10")).toBe("video");
     });
   });
 
   describe("image detection patterns", () => {
     test(".jpg URL detected as image", () => {
-      expect(
-        FilterEngine.determinePostType({ url: "https://example.com/photo.jpg" } as any),
-      ).toBe("image");
+      expect(determinePostTypeForUrl("https://example.com/photo.jpg")).toBe("image");
     });
 
     test(".png URL detected as image", () => {
-      expect(
-        FilterEngine.determinePostType({ url: "https://example.com/screenshot.png" } as any),
-      ).toBe("image");
+      expect(determinePostTypeForUrl("https://example.com/screenshot.png")).toBe("image");
     });
 
     test(".webp URL with query param detected as image", () => {
-      expect(
-        FilterEngine.determinePostType({ url: "https://example.com/pic.webp?w=800" } as any),
-      ).toBe("image");
+      expect(determinePostTypeForUrl("https://example.com/pic.webp?w=800")).toBe("image");
     });
 
     test("redgifs.com detected as image", () => {
-      expect(
-        FilterEngine.determinePostType({ url: "https://redgifs.com/watch/something" } as any),
-      ).toBe("image");
+      expect(determinePostTypeForUrl("https://redgifs.com/watch/something")).toBe("image");
     });
 
     test("gfycat.com detected as image", () => {
-      expect(
-        FilterEngine.determinePostType({ url: "https://gfycat.com/clip" } as any),
-      ).toBe("image");
+      expect(determinePostTypeForUrl("https://gfycat.com/clip")).toBe("image");
     });
   });
 
@@ -1112,9 +1095,7 @@ describe("FilterEngine", () => {
     });
 
     test("skipExisting items are not counted in breakdown", () => {
-      const engine = new FilterEngine(
-        makeSettings({ minScore: 0 }),
-      );
+      const engine = new FilterEngine(makeSettings({ minScore: 0 }));
       const items = [
         makeItem({ id: "existing1", score: 50 } as Partial<RedditItemData>),
         makeItem({ id: "new1", score: 50 } as Partial<RedditItemData>),

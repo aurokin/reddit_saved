@@ -29,10 +29,18 @@ export async function unsaveCmd(
 
   // Collect IDs from --id flag or query filters
   const idFlag = flagStr(flags, "id");
-  const ids: string[] = idFlag ? idFlag.split(",").map((s) => s.trim()) : [];
+  const ids: string[] = [...(idFlag ? idFlag.split(",") : []), ...(idFlag ? positionals : [])]
+    .map((s) => s.trim())
+    .filter(Boolean);
 
-  const hasFilters =
-    flagStr(flags, "subreddit") || flagStr(flags, "tag") || flagBool(flags, "orphaned");
+  const hasFilters = Boolean(
+    flagStr(flags, "subreddit") || flagStr(flags, "tag") || flagBool(flags, "orphaned"),
+  );
+
+  if (ids.length > 0 && hasFilters) {
+    printError("Use either --id selectors or filter selectors, not both, for unsave.");
+    process.exit(1);
+  }
 
   if (ids.length === 0 && !hasFilters) {
     printError("Specify items with --id or filter flags (--subreddit, --tag, --orphaned).");
@@ -50,6 +58,10 @@ export async function unsaveCmd(
     // Resolve IDs from filters
     if (ids.length === 0 && hasFilters) {
       const limit = flagInt(flags, "limit") ?? 1000;
+      if (limit <= 0) {
+        printError("--limit must be a positive integer.");
+        process.exit(1);
+      }
       const opts: ListOptions = {
         subreddit: flagStr(flags, "subreddit"),
         tag: flagStr(flags, "tag"),
@@ -61,7 +73,9 @@ export async function unsaveCmd(
         ids.push(p.id);
       }
       if (posts.length >= limit) {
-        printWarning(`Matched ${limit}+ items. Only the first ${limit} will be processed. Use --limit to adjust.`);
+        printWarning(
+          `Matched ${limit}+ items. Only the first ${limit} will be processed. Use --limit to adjust.`,
+        );
       }
     }
 

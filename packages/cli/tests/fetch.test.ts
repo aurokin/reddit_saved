@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { SqliteAdapter } from "@reddit-saved/core";
+import { RedditApiClient, SqliteAdapter } from "@reddit-saved/core";
 import { setOutputMode } from "../src/output";
-import { captureConsole, captureExit, ExitCaptured, makeTempDb, restoreFetch } from "./helpers";
+import { ExitCaptured, captureConsole, captureExit, makeTempDb, restoreFetch } from "./helpers";
 
 const originalEnv = { ...process.env };
 
@@ -276,13 +276,23 @@ describe("fetch command", () => {
     const cap = captureConsole();
     try {
       await fetchCmd({ db: dbPath }, []);
-      // Circuit breaker absorbs the 403 and returns 0 items — verify that
       const output = JSON.parse(cap.logs[0]);
       expect(output.fetched).toBe(0);
       expect(output.stored).toBe(0);
+      expect(output.errored).toBe(true);
+      expect(cap.errors.some((e) => e.includes("Resume state was preserved"))).toBe(true);
     } finally {
       cap.restore();
     }
+
+    const adapter = new SqliteAdapter(dbPath);
+    try {
+      expect(adapter.getSyncState("last_sync_time")).toBeNull();
+    } finally {
+      adapter.close();
+    }
+
+    expect(existsSync(join(dirname(dbPath), ".reddit-import-checkpoint.json"))).toBe(true);
   });
 
   test("resumes from checkpoint when one exists", async () => {
@@ -319,6 +329,195 @@ describe("fetch command", () => {
       expect(receivedUrl).toContain("after=resume_cursor_abc");
       // Verify resume message was printed
       expect(cap.errors.some((e) => e.includes("Resuming"))).toBe(true);
+    } finally {
+      cap.restore();
+    }
+  });
+
+  test("resumes from stored incremental cursor when no checkpoint exists", async () => {
+    const adapter = new SqliteAdapter(dbPath);
+    adapter.setSyncState("last_cursor_saved", "stored_cursor_123");
+    adapter.close();
+
+    let receivedUrl = "";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+      if (url.includes("/api/v1/me")) {
+        return Response.json({ name: "testuser" }, { headers: rateHeaders });
+      }
+      if (url.includes("/user/") && url.includes("/saved")) {
+        receivedUrl = url;
+        return Response.json(makeRedditListingResponse([{ id: "stored_resume_p1" }], null), {
+          headers: rateHeaders,
+        });
+      }
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    const { fetchCmd } = await import("../src/commands/fetch");
+    const cap = captureConsole();
+    try {
+      await fetchCmd({ db: dbPath }, []);
+      expect(receivedUrl).toContain("after=stored_cursor_123");
+      expect(
+        cap.errors.some((e) =>
+          e.includes("Resuming incremental saved fetch from the last stored cursor."),
+        ),
+      ).toBe(true);
+    } finally {
+      cap.restore();
+    }
+  });
+
+  test("checkpoint cursor takes precedence over stored incremental cursor", async () => {
+    const adapter = new SqliteAdapter(dbPath);
+    adapter.setSyncState("last_cursor_saved", "stored_cursor_123");
+    adapter.close();
+
+    const { SyncStateManager } = await import("@reddit-saved/core");
+    const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.json");
+    const stateManager = new SyncStateManager(checkpointPath);
+    const checkpoint = stateManager.createNew();
+    checkpoint.cursor = "checkpoint_cursor_999";
+    checkpoint.totalFetched = 7;
+    await stateManager.save(checkpoint);
+
+    let receivedUrl = "";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+      if (url.includes("/api/v1/me")) {
+        return Response.json({ name: "testuser" }, { headers: rateHeaders });
+      }
+      if (url.includes("/user/") && url.includes("/saved")) {
+        receivedUrl = url;
+        return Response.json(makeRedditListingResponse([{ id: "checkpoint_resume_p1" }], null), {
+          headers: rateHeaders,
+        });
+      }
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    const { fetchCmd } = await import("../src/commands/fetch");
+    const cap = captureConsole();
+    try {
+      await fetchCmd({ db: dbPath }, []);
+      expect(receivedUrl).toContain("after=checkpoint_cursor_999");
+      expect(receivedUrl).not.toContain("stored_cursor_123");
+      expect(cap.errors.some((e) => e.includes("Found checkpoint"))).toBe(true);
+    } finally {
+      cap.restore();
+    }
+  });
+
+  test("scoped incremental cursor is used and cleared on successful completion", async () => {
+    const adapter = new SqliteAdapter(dbPath);
+    adapter.setSyncState("last_cursor_saved", "saved_cursor_111");
+    adapter.close();
+
+    let receivedUrl = "";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+      if (url.includes("/api/v1/me")) {
+        return Response.json({ name: "testuser" }, { headers: rateHeaders });
+      }
+      if (url.includes("/user/") && url.includes("/saved")) {
+        receivedUrl = url;
+        return Response.json(makeRedditListingResponse([{ id: "scoped_resume_saved1" }], null), {
+          headers: rateHeaders,
+        });
+      }
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    const { fetchCmd } = await import("../src/commands/fetch");
+    const cap = captureConsole();
+    try {
+      await fetchCmd({ db: dbPath }, []);
+      expect(receivedUrl).toContain("after=saved_cursor_111");
+    } finally {
+      cap.restore();
+    }
+
+    const verifyAdapter = new SqliteAdapter(dbPath);
+    try {
+      expect(verifyAdapter.getSyncState("last_cursor_saved")).toBeNull();
+    } finally {
+      verifyAdapter.close();
+    }
+  });
+
+  test("ignores checkpoint from a different origin", async () => {
+    const { SyncStateManager } = await import("@reddit-saved/core");
+    const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.json");
+    const stateManager = new SyncStateManager(checkpointPath);
+    const checkpoint = stateManager.createNew(undefined, {
+      contentOrigin: "upvoted",
+      isFull: false,
+    });
+    checkpoint.cursor = "upvoted_cursor_999";
+    checkpoint.totalFetched = 7;
+    await stateManager.save(checkpoint);
+
+    let receivedUrl = "";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+      if (url.includes("/api/v1/me")) {
+        return Response.json({ name: "testuser" }, { headers: rateHeaders });
+      }
+      if (url.includes("/user/") && url.includes("/saved")) {
+        receivedUrl = url;
+        return Response.json(makeRedditListingResponse([{ id: "saved_from_start" }], null), {
+          headers: rateHeaders,
+        });
+      }
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    const { fetchCmd } = await import("../src/commands/fetch");
+    const cap = captureConsole();
+    try {
+      await fetchCmd({ db: dbPath }, []);
+      expect(receivedUrl).not.toContain("after=upvoted_cursor_999");
+      expect(cap.errors.some((e) => e.includes("Ignoring checkpoint"))).toBe(true);
+    } finally {
+      cap.restore();
+    }
+  });
+
+  test("ignores incremental checkpoint during full fetch", async () => {
+    const { SyncStateManager } = await import("@reddit-saved/core");
+    const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.json");
+    const stateManager = new SyncStateManager(checkpointPath);
+    const checkpoint = stateManager.createNew(undefined, { contentOrigin: "saved", isFull: false });
+    checkpoint.cursor = "incremental_cursor_999";
+    await stateManager.save(checkpoint);
+
+    let receivedUrl = "";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+      if (url.includes("/api/v1/me")) {
+        return Response.json({ name: "testuser" }, { headers: rateHeaders });
+      }
+      if (url.includes("/user/") && url.includes("/saved")) {
+        receivedUrl = url;
+        return Response.json(makeRedditListingResponse([{ id: "full_fetch_start" }], null), {
+          headers: rateHeaders,
+        });
+      }
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    const { fetchCmd } = await import("../src/commands/fetch");
+    const cap = captureConsole();
+    try {
+      await fetchCmd({ db: dbPath, full: true }, []);
+      expect(receivedUrl).not.toContain("after=incremental_cursor_999");
+      expect(cap.errors.some((e) => e.includes("Ignoring checkpoint"))).toBe(true);
     } finally {
       cap.restore();
     }
@@ -405,6 +604,84 @@ describe("fetch command", () => {
     }
   });
 
+  test("stores incremental cursor per content origin", async () => {
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+      if (url.includes("/api/v1/me")) {
+        return Response.json({ name: "testuser" }, { headers: rateHeaders });
+      }
+      if (url.includes("/user/") && url.includes("/upvoted")) {
+        return Response.json(
+          makeRedditListingResponse([{ id: "up_cursor_p1" }], "up_next_cursor"),
+          {
+            headers: rateHeaders,
+          },
+        );
+      }
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    const { fetchCmd } = await import("../src/commands/fetch");
+    const cap = captureConsole();
+    try {
+      await fetchCmd({ db: dbPath, type: "upvoted", limit: "1" }, []);
+      const output = JSON.parse(cap.logs[0]);
+      expect(output.hasMore).toBe(true);
+    } finally {
+      cap.restore();
+    }
+
+    const adapter = new SqliteAdapter(dbPath);
+    try {
+      expect(adapter.getSyncState("last_cursor_upvoted")).toBe("up_next_cursor");
+      expect(adapter.getSyncState("last_cursor_saved")).toBeNull();
+    } finally {
+      adapter.close();
+    }
+  });
+
+  test("stored incremental cursors are scoped by origin", async () => {
+    const adapter = new SqliteAdapter(dbPath);
+    adapter.setSyncState("last_cursor_saved", "saved_cursor_111");
+    adapter.setSyncState("last_cursor_upvoted", "upvoted_cursor_222");
+    adapter.close();
+
+    let receivedUrl = "";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+      if (url.includes("/api/v1/me")) {
+        return Response.json({ name: "testuser" }, { headers: rateHeaders });
+      }
+      if (url.includes("/user/") && url.includes("/upvoted")) {
+        receivedUrl = url;
+        return Response.json(makeRedditListingResponse([{ id: "up_scoped_p1" }], null), {
+          headers: rateHeaders,
+        });
+      }
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    const { fetchCmd } = await import("../src/commands/fetch");
+    const cap = captureConsole();
+    try {
+      await fetchCmd({ db: dbPath, type: "upvoted" }, []);
+      expect(receivedUrl).toContain("after=upvoted_cursor_222");
+      expect(receivedUrl).not.toContain("saved_cursor_111");
+    } finally {
+      cap.restore();
+    }
+
+    const verifyAdapter = new SqliteAdapter(dbPath);
+    try {
+      expect(verifyAdapter.getSyncState("last_cursor_upvoted")).toBeNull();
+      expect(verifyAdapter.getSyncState("last_cursor_saved")).toBe("saved_cursor_111");
+    } finally {
+      verifyAdapter.close();
+    }
+  });
+
   test("--full reports orphaned count in output", async () => {
     // Pre-seed DB with an item that won't appear in the fetch response
     const adapter = new SqliteAdapter(dbPath);
@@ -456,6 +733,44 @@ describe("fetch command", () => {
     }
   });
 
+  test("--full ignores stored incremental cursor and clears it on success", async () => {
+    const adapter = new SqliteAdapter(dbPath);
+    adapter.setSyncState("last_cursor_saved", "stored_cursor_123");
+    adapter.close();
+
+    let receivedUrl = "";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+      if (url.includes("/api/v1/me")) {
+        return Response.json({ name: "testuser" }, { headers: rateHeaders });
+      }
+      if (url.includes("/user/") && url.includes("/saved")) {
+        receivedUrl = url;
+        return Response.json(makeRedditListingResponse([{ id: "full_ignore_cursor" }], null), {
+          headers: rateHeaders,
+        });
+      }
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    const { fetchCmd } = await import("../src/commands/fetch");
+    const cap = captureConsole();
+    try {
+      await fetchCmd({ db: dbPath, full: true }, []);
+      expect(receivedUrl).not.toContain("after=stored_cursor_123");
+    } finally {
+      cap.restore();
+    }
+
+    const verifyAdapter = new SqliteAdapter(dbPath);
+    try {
+      expect(verifyAdapter.getSyncState("last_cursor_saved")).toBeNull();
+    } finally {
+      verifyAdapter.close();
+    }
+  });
+
   test("human mode shows Fetch Complete section", async () => {
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -486,6 +801,80 @@ describe("fetch command", () => {
     }
   });
 
+  test("clears stored incremental cursor once the listing is exhausted", async () => {
+    const adapter = new SqliteAdapter(dbPath);
+    adapter.setSyncState("last_cursor_saved", "stored_cursor_123");
+    adapter.close();
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+      if (url.includes("/api/v1/me")) {
+        return Response.json({ name: "testuser" }, { headers: rateHeaders });
+      }
+      if (url.includes("/user/") && url.includes("/saved")) {
+        return Response.json(makeRedditListingResponse([{ id: "clear_cursor_p1" }], null), {
+          headers: rateHeaders,
+        });
+      }
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    const { fetchCmd } = await import("../src/commands/fetch");
+    const cap = captureConsole();
+    try {
+      await fetchCmd({ db: dbPath }, []);
+    } finally {
+      cap.restore();
+    }
+
+    const verifyAdapter = new SqliteAdapter(dbPath);
+    try {
+      expect(verifyAdapter.getSyncState("last_cursor_saved")).toBeNull();
+    } finally {
+      verifyAdapter.close();
+    }
+  });
+
+  test("preserves checkpoint and cursor when pagination fails after partial progress", async () => {
+    const originalFetchSaved = RedditApiClient.prototype.fetchSaved;
+    RedditApiClient.prototype.fetchSaved = async () => ({
+      items: makeRedditListingResponse([{ id: "page1_ok" }], "resume_after_page1").data.children,
+      cursor: "resume_after_page1",
+      hasMore: false,
+      wasCancelled: false,
+      wasErrored: true,
+    });
+
+    const { fetchCmd } = await import("../src/commands/fetch");
+    const cap = captureConsole();
+    try {
+      await fetchCmd({ db: dbPath }, []);
+      const output = JSON.parse(cap.logs[0]);
+      expect(output.fetched).toBe(1);
+      expect(output.stored).toBe(1);
+      expect(output.errored).toBe(true);
+    } finally {
+      RedditApiClient.prototype.fetchSaved = originalFetchSaved;
+      cap.restore();
+    }
+
+    const adapter = new SqliteAdapter(dbPath);
+    try {
+      expect(adapter.getSyncState("last_sync_time")).toBeNull();
+      expect(adapter.getSyncState("last_cursor_saved")).toBe("resume_after_page1");
+    } finally {
+      adapter.close();
+    }
+
+    const { SyncStateManager } = await import("@reddit-saved/core");
+    const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.json");
+    const stateManager = new SyncStateManager(checkpointPath);
+    const checkpoint = await stateManager.load();
+    expect(checkpoint?.cursor).toBe("resume_after_page1");
+    expect(checkpoint?.totalFetched).toBe(1);
+  });
+
   test("preserves checkpoint when upsertPosts fails", async () => {
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -513,7 +902,7 @@ describe("fetch command", () => {
 
     // Monkey-patch SqliteAdapter.prototype.upsertPosts to throw
     const origUpsert = SqliteAdapter.prototype.upsertPosts;
-    SqliteAdapter.prototype.upsertPosts = function () {
+    SqliteAdapter.prototype.upsertPosts = () => {
       throw new Error("Simulated DB write failure");
     };
 

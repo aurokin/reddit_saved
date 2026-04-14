@@ -1,4 +1,8 @@
-import { startOAuthServer } from "@reddit-saved/core";
+import {
+  DEFAULT_REDIRECT_PORT,
+  type OAuthServerHandle,
+  startOAuthServer,
+} from "@reddit-saved/core";
 import { isHumanMode, printError, printInfo, printJson } from "../output";
 
 export async function authLogin(
@@ -29,22 +33,42 @@ export async function authLogin(
 
   printInfo("Starting OAuth flow...");
 
-  const handle = await startOAuthServer({
-    clientId,
-    clientSecret,
-    onAuthorizeUrl: (url) => {
-      printInfo(`Open this URL to authenticate:\n\n  ${url}\n`);
-      openBrowser(url);
-    },
-    onSuccess: (username) => {
-      if (isHumanMode()) {
-        printInfo(`\nAuthenticated as ${username}`);
-      }
-    },
-    onError: (error) => {
-      printError(error.message);
-    },
-  });
+  let handle: OAuthServerHandle;
+  try {
+    handle = await startOAuthServer({
+      clientId,
+      clientSecret,
+      onAuthorizeUrl: (url) => {
+        printInfo(`Open this URL to authenticate:\n\n  ${url}\n`);
+        openBrowser(url);
+      },
+      onSuccess: (username) => {
+        if (isHumanMode()) {
+          printInfo(`\nAuthenticated as ${username}`);
+        }
+      },
+      onError: (error) => {
+        printError(error.message);
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const code =
+      typeof err === "object" && err !== null && "code" in err ? String(err.code) : undefined;
+    if (
+      code === "EADDRINUSE" ||
+      message.includes("EADDRINUSE") ||
+      message.includes("address already in use") ||
+      message.includes(`port ${DEFAULT_REDIRECT_PORT} in use`)
+    ) {
+      printError(
+        `OAuth callback port ${DEFAULT_REDIRECT_PORT} is already in use. Close the other login flow or free that port and retry.`,
+        "OAUTH_PORT_IN_USE",
+      );
+      process.exit(1);
+    }
+    throw err;
+  }
 
   try {
     await handle.done;

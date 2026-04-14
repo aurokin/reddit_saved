@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { DEFAULT_FILTER_SETTINGS } from "../src/constants";
 import { FilterEngine } from "../src/filters/engine";
 import { FILTER_PRESETS } from "../src/filters/presets";
-import type { RedditItemData } from "../src/types";
+import type { FilterSettings, RedditItemData } from "../src/types";
 
 describe("FILTER_PRESETS", () => {
   test("all presets have enabled: true", () => {
@@ -136,14 +136,16 @@ describe("FILTER_PRESETS", () => {
   });
 
   test("DEFAULT_FILTER_SETTINGS is frozen (mutation throws)", () => {
+    const mutableSettings = DEFAULT_FILTER_SETTINGS as unknown as FilterSettings;
+
     expect(() => {
-      (DEFAULT_FILTER_SETTINGS as any).enabled = true;
+      mutableSettings.enabled = true;
     }).toThrow();
     expect(() => {
-      (DEFAULT_FILTER_SETTINGS.subredditList as any).push("test");
+      mutableSettings.subredditList.push("test");
     }).toThrow();
     expect(() => {
-      (DEFAULT_FILTER_SETTINGS.includePostTypes as any).push("video");
+      mutableSettings.includePostTypes.push("video");
     }).toThrow();
   });
 });

@@ -67,7 +67,7 @@ Commands:
   auth status             Show authentication status
   auth logout             Clear stored credentials
 
-  fetch                   Fetch saved posts from Reddit
+  fetch                   Fetch Reddit content into the local cache
   search <query>          Full-text search saved posts
   list                    Browse saved posts with filters
   status                  Show database statistics

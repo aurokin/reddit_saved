@@ -125,6 +125,17 @@ describe("parseArgs", () => {
     expect(result.flags.id).toBe("abc123");
   });
 
+  test("repeated --id flags are accumulated", () => {
+    const result = parseArgs(["unsave", "--id", "abc123", "--id", "def456"]);
+    expect(result.flags.id).toBe("abc123,def456");
+  });
+
+  test("--id consumes one value and leaves remaining IDs as positionals", () => {
+    const result = parseArgs(["unsave", "--id", "abc123", "def456", "ghi789"]);
+    expect(result.flags.id).toBe("abc123");
+    expect(result.positionals).toEqual(["def456", "ghi789"]);
+  });
+
   test("boolean flag --orphaned does not consume next arg", () => {
     const result = parseArgs(["list", "--orphaned", "--limit", "10"]);
     expect(result.flags.orphaned).toBe(true);

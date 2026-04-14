@@ -94,21 +94,21 @@ export function parseArgs(argv: string[]): ParsedArgs {
         const name = arg.slice(2, eqIdx);
         const val = arg.slice(eqIdx + 1);
         if (BOOLEAN_FLAGS.has(name)) {
-          flags[name] = val !== "false" && val !== "0" && val !== "";
+          setFlagValue(flags, name, val !== "false" && val !== "0" && val !== "");
         } else {
-          flags[name] = val;
+          setFlagValue(flags, name, val);
         }
       } else {
         const name = arg.slice(2);
         if (BOOLEAN_FLAGS.has(name)) {
-          flags[name] = true;
+          setFlagValue(flags, name, true);
         } else {
           const next = argv[i + 1];
           if (next !== undefined && (!next.startsWith("-") || /^-\d/.test(next))) {
-            flags[name] = next;
+            setFlagValue(flags, name, next);
             i++;
           } else {
-            flags[name] = true;
+            setFlagValue(flags, name, true);
           }
         }
       }
@@ -207,4 +207,17 @@ export function mapTypeFlag(type: string | undefined): "t1" | "t3" | undefined {
   if (type === "post") return "t3";
   if (type === "comment") return "t1";
   throw new Error(`Invalid --type: "${type}". Must be one of: post, comment`);
+}
+
+function setFlagValue(
+  flags: Record<string, string | boolean>,
+  name: string,
+  value: string | boolean,
+): void {
+  if (name === "id" && typeof value === "string" && typeof flags[name] === "string") {
+    flags[name] = `${flags[name]},${value}`;
+    return;
+  }
+
+  flags[name] = value;
 }

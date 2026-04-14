@@ -199,9 +199,7 @@ beforeAll(() => {
               created_utc: Math.floor(Date.now() / 1000),
               is_submitter: false,
               depth,
-              replies: childReply
-                ? { kind: "Listing", data: { children: [childReply] } }
-                : "",
+              replies: childReply ? { kind: "Listing", data: { children: [childReply] } } : "",
             },
           });
           // depth 3 -> 2 -> 1 -> 0
@@ -547,9 +545,7 @@ describe("RedditApiClient", () => {
       const client = createClient({
         tokenProvider: createMockTokenProvider({ accessToken: "no-name-token" }),
       });
-      await expect(client.fetchUsername()).rejects.toThrow(
-        "Reddit API did not return a username",
-      );
+      await expect(client.fetchUsername()).rejects.toThrow("Reddit API did not return a username");
     });
 
     test("throws for null/empty body (204 No Content)", async () => {
@@ -718,9 +714,7 @@ describe("RedditApiClient", () => {
 
     test("fetchPostComments returns [] for short array body", async () => {
       const client = createClient();
-      const comments = await client.fetchPostComments(
-        "/r/testsubreddit/comments/short_post/test",
-      );
+      const comments = await client.fetchPostComments("/r/testsubreddit/comments/short_post/test");
       expect(comments).toEqual([]);
     });
 
@@ -903,9 +897,12 @@ describe("RedditApiClient", () => {
       const client = createClient();
       const thread = await client.fetchCommentThread("deep_post", "testsubreddit");
       expect(thread).not.toBeNull();
+      if (!thread) {
+        throw new Error("Expected a comment thread");
+      }
 
       // flattenCommentTree should return all comments within depth limit
-      const commentIds = thread!.comments.map((c) => c.id);
+      const commentIds = thread.comments.map((c) => c.id);
       expect(commentIds).toContain("d0");
       expect(commentIds).toContain("d1");
     });
@@ -974,9 +971,14 @@ describe("RedditApiClient", () => {
         },
       };
       const queue = new RequestQueue();
-      const client = new RedditApiClient(tp, queue, {
-        onError: (err) => errors.push(err),
-      }, baseUrl);
+      const client = new RedditApiClient(
+        tp,
+        queue,
+        {
+          onError: (err) => errors.push(err),
+        },
+        baseUrl,
+      );
       const result = await client.fetchSaved();
       expect(result.wasErrored).toBe(true);
       expect(result.items.length).toBe(0);
@@ -1005,9 +1007,14 @@ describe("RedditApiClient", () => {
       };
       const queue = new RequestQueue({ maxRetries: 0 });
       const errors: Error[] = [];
-      const client = new RedditApiClient(tp, queue, {
-        onError: (err) => errors.push(err),
-      }, baseUrl);
+      const client = new RedditApiClient(
+        tp,
+        queue,
+        {
+          onError: (err) => errors.push(err),
+        },
+        baseUrl,
+      );
       const result = await client.fetchSaved();
       // Page 1 succeeded, page 2 token failure retried and then succeeded on next attempt
       expect(result.items.length).toBeGreaterThan(0);
@@ -1019,9 +1026,14 @@ describe("RedditApiClient", () => {
       const errors: Error[] = [];
       const tp = createMockTokenProvider({ username: "error_user" });
       const queue = new RequestQueue({ maxRetries: 0 });
-      const client = new RedditApiClient(tp, queue, {
-        onError: (err) => errors.push(err),
-      }, baseUrl);
+      const client = new RedditApiClient(
+        tp,
+        queue,
+        {
+          onError: (err) => errors.push(err),
+        },
+        baseUrl,
+      );
 
       const result = await client.fetchSaved();
       // Should have page 1 items (3) but page 2 failed 3 times
@@ -1183,9 +1195,14 @@ describe("RedditApiClient", () => {
         },
       };
       const queue = new RequestQueue();
-      const client = new RedditApiClient(tp, queue, {
-        onError: (error, retryable) => errors.push({ error, retryable }),
-      }, baseUrl);
+      const client = new RedditApiClient(
+        tp,
+        queue,
+        {
+          onError: (error, retryable) => errors.push({ error, retryable }),
+        },
+        baseUrl,
+      );
 
       await client.unsaveItems(["t3_ok1"]);
 
@@ -1275,9 +1292,14 @@ describe("RedditApiClient", () => {
       const errors: Error[] = [];
       const tp = createMockTokenProvider();
       const queue = new RequestQueue({ maxRetries: 0 });
-      const client = new RedditApiClient(tp, queue, {
-        onError: (err) => errors.push(err),
-      }, failBaseUrl);
+      const client = new RedditApiClient(
+        tp,
+        queue,
+        {
+          onError: (err) => errors.push(err),
+        },
+        failBaseUrl,
+      );
 
       const result = await client.fetchSaved();
 
@@ -1502,9 +1524,14 @@ describe("RedditApiClient", () => {
       const tp = createMockTokenProvider({ username: "lowrate_user" });
       const queue = new RequestQueue({ maxRetries: 0 });
       const rateLimitCalls: Array<[number, number]> = [];
-      const client = new RedditApiClient(tp, queue, {
-        onRateLimit: (resetMs, remaining) => rateLimitCalls.push([resetMs, remaining]),
-      }, lowRateUrl);
+      const client = new RedditApiClient(
+        tp,
+        queue,
+        {
+          onRateLimit: (resetMs, remaining) => rateLimitCalls.push([resetMs, remaining]),
+        },
+        lowRateUrl,
+      );
 
       await client.fetchSaved();
 
@@ -1536,9 +1563,14 @@ describe("RedditApiClient", () => {
       const tp = createMockTokenProvider({ username: "badheader_user" });
       const queue = new RequestQueue({ maxRetries: 0 });
       const rateLimitCalls: Array<[number, number]> = [];
-      const client = new RedditApiClient(tp, queue, {
-        onRateLimit: (resetMs, remaining) => rateLimitCalls.push([resetMs, remaining]),
-      }, badHeaderUrl);
+      const client = new RedditApiClient(
+        tp,
+        queue,
+        {
+          onRateLimit: (resetMs, remaining) => rateLimitCalls.push([resetMs, remaining]),
+        },
+        badHeaderUrl,
+      );
 
       await client.fetchSaved();
 

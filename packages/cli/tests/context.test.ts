@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { SqliteAdapter } from "@reddit-saved/core";
 import { setOutputMode } from "../src/output";
-import { captureConsole, captureExit, ExitCaptured, makeTempDb } from "./helpers";
+import { ExitCaptured, captureConsole, captureExit, makeTempDb } from "./helpers";
 
 const originalEnv = { ...process.env };
 
@@ -24,8 +24,8 @@ describe("createContext", () => {
     // Restore env
     process.env.XDG_CONFIG_HOME = originalEnv.XDG_CONFIG_HOME;
     process.env.XDG_DATA_HOME = originalEnv.XDG_DATA_HOME;
-    if (!originalEnv.XDG_CONFIG_HOME) delete process.env.XDG_CONFIG_HOME;
-    if (!originalEnv.XDG_DATA_HOME) delete process.env.XDG_DATA_HOME;
+    if (!originalEnv.XDG_CONFIG_HOME) process.env.XDG_CONFIG_HOME = undefined;
+    if (!originalEnv.XDG_DATA_HOME) process.env.XDG_DATA_HOME = undefined;
     if (dbPath) {
       rmSync(dirname(dbPath), { recursive: true, force: true });
     }

@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { rename, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
+import type { ContentOrigin } from "../types";
 import { paths } from "../utils/paths";
 
 /**
@@ -10,6 +11,8 @@ import { paths } from "../utils/paths";
  */
 export interface CheckpointData {
   sessionId: string;
+  contentOrigin: ContentOrigin;
+  isFull: boolean;
   cursor: string | null;
   fetchedIds: string[];
   failedIds: string[];
@@ -53,17 +56,18 @@ export class SyncStateManager {
       return null;
     }
 
-    if (!isValidCheckpoint(parsed)) {
+    const checkpoint = normalizeCheckpoint(parsed);
+    if (!checkpoint) {
       await this.clear();
       return null;
     }
 
     // Normalize: save() always writes empty arrays, but external/older
     // checkpoints may have populated arrays. Normalize to match save() contract.
-    parsed.fetchedIds = [];
-    parsed.failedIds = [];
+    checkpoint.fetchedIds = [];
+    checkpoint.failedIds = [];
 
-    return parsed;
+    return checkpoint;
   }
 
   async save(data: CheckpointData): Promise<void> {
@@ -117,9 +121,17 @@ export class SyncStateManager {
     }
   }
 
-  createNew(sessionId?: string): CheckpointData {
+  createNew(
+    sessionId?: string,
+    options?: {
+      contentOrigin?: ContentOrigin;
+      isFull?: boolean;
+    },
+  ): CheckpointData {
     return {
       sessionId: sessionId ?? crypto.randomUUID(),
+      contentOrigin: options?.contentOrigin ?? "saved",
+      isFull: options?.isFull ?? false,
       cursor: null,
       fetchedIds: [],
       failedIds: [],
@@ -133,12 +145,22 @@ export class SyncStateManager {
 
 const VALID_PHASES = new Set(["fetching", "storing", "cleanup"]);
 
+function normalizeCheckpoint(value: unknown): CheckpointData | null {
+  if (typeof value !== "object" || value === null) return null;
+  return isValidCheckpoint(value) ? (value as CheckpointData) : null;
+}
+
 function isValidCheckpoint(value: unknown): value is CheckpointData {
   if (typeof value !== "object" || value === null) return false;
   const obj = value as Record<string, unknown>;
   return (
     typeof obj.sessionId === "string" &&
     obj.sessionId.length <= 64 &&
+    (obj.contentOrigin === "saved" ||
+      obj.contentOrigin === "upvoted" ||
+      obj.contentOrigin === "submitted" ||
+      obj.contentOrigin === "commented") &&
+    typeof obj.isFull === "boolean" &&
     typeof obj.phase === "string" &&
     VALID_PHASES.has(obj.phase) &&
     (obj.cursor === null || (typeof obj.cursor === "string" && obj.cursor.length <= 200)) &&

@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setOutputMode } from "../src/output";
-import { captureConsole, captureExit, ExitCaptured, makeTempDb, restoreFetch } from "./helpers";
+import { ExitCaptured, captureConsole, captureExit, makeTempDb, restoreFetch } from "./helpers";
 
 const originalEnv = { ...process.env };
 
@@ -20,11 +20,11 @@ describe("auth status", () => {
   afterEach(() => {
     setOutputMode(false, false, false);
     process.env.XDG_CONFIG_HOME = originalEnv.XDG_CONFIG_HOME;
-    if (!originalEnv.XDG_CONFIG_HOME) delete process.env.XDG_CONFIG_HOME;
+    if (!originalEnv.XDG_CONFIG_HOME) process.env.XDG_CONFIG_HOME = undefined;
     if (originalEnv.REDDIT_CLIENT_SECRET !== undefined) {
       process.env.REDDIT_CLIENT_SECRET = originalEnv.REDDIT_CLIENT_SECRET;
     } else {
-      delete process.env.REDDIT_CLIENT_SECRET;
+      process.env.REDDIT_CLIENT_SECRET = undefined;
     }
     rmSync(tempDir, { recursive: true, force: true });
   });
@@ -112,7 +112,7 @@ describe("auth status", () => {
         clientId: "test-client-id",
       }),
     );
-    delete process.env.REDDIT_CLIENT_SECRET;
+    process.env.REDDIT_CLIENT_SECRET = undefined;
 
     const { authStatus } = await import("../src/auth/status");
     const cap = captureConsole();
@@ -140,7 +140,7 @@ describe("auth logout", () => {
   afterEach(() => {
     setOutputMode(false, false, false);
     process.env.XDG_CONFIG_HOME = originalEnv.XDG_CONFIG_HOME;
-    if (!originalEnv.XDG_CONFIG_HOME) delete process.env.XDG_CONFIG_HOME;
+    if (!originalEnv.XDG_CONFIG_HOME) process.env.XDG_CONFIG_HOME = undefined;
     rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -170,10 +170,10 @@ describe("auth login", () => {
   afterEach(() => {
     setOutputMode(false, false, false);
     process.env.XDG_CONFIG_HOME = originalEnv.XDG_CONFIG_HOME;
-    if (!originalEnv.XDG_CONFIG_HOME) delete process.env.XDG_CONFIG_HOME;
+    if (!originalEnv.XDG_CONFIG_HOME) process.env.XDG_CONFIG_HOME = undefined;
     // Clean up env vars that might have been set
-    delete process.env.REDDIT_CLIENT_ID;
-    delete process.env.REDDIT_CLIENT_SECRET;
+    process.env.REDDIT_CLIENT_ID = undefined;
+    process.env.REDDIT_CLIENT_SECRET = undefined;
     if (originalEnv.REDDIT_CLIENT_ID) process.env.REDDIT_CLIENT_ID = originalEnv.REDDIT_CLIENT_ID;
     if (originalEnv.REDDIT_CLIENT_SECRET)
       process.env.REDDIT_CLIENT_SECRET = originalEnv.REDDIT_CLIENT_SECRET;
@@ -181,8 +181,8 @@ describe("auth login", () => {
   });
 
   test("exits with error when client ID missing", async () => {
-    delete process.env.REDDIT_CLIENT_ID;
-    delete process.env.REDDIT_CLIENT_SECRET;
+    process.env.REDDIT_CLIENT_ID = undefined;
+    process.env.REDDIT_CLIENT_SECRET = undefined;
 
     const { authLogin } = await import("../src/auth/login");
     const cap = captureConsole();
@@ -201,7 +201,7 @@ describe("auth login", () => {
 
   test("exits with error when client secret missing", async () => {
     process.env.REDDIT_CLIENT_ID = "test-id";
-    delete process.env.REDDIT_CLIENT_SECRET;
+    process.env.REDDIT_CLIENT_SECRET = undefined;
 
     const { authLogin } = await import("../src/auth/login");
     const cap = captureConsole();
@@ -216,6 +216,37 @@ describe("auth login", () => {
     }
     expect(exit.exitCode).toBe(1);
     expect(cap.errors[0]).toContain("client secret");
+  });
+
+  test("exits with a clear error when the OAuth callback port is already in use", async () => {
+    process.env.REDDIT_CLIENT_ID = "test-id";
+    process.env.REDDIT_CLIENT_SECRET = "test-secret";
+
+    const occupiedServer = Bun.serve({
+      port: 9638,
+      hostname: "127.0.0.1",
+      fetch() {
+        return new Response("busy");
+      },
+    });
+
+    const { authLogin } = await import("../src/auth/login");
+    const cap = captureConsole();
+    const exit = captureExit();
+    try {
+      await authLogin({});
+    } catch (e) {
+      expect(e).toBeInstanceOf(ExitCaptured);
+    } finally {
+      occupiedServer.stop(true);
+      exit.restore();
+      cap.restore();
+    }
+
+    expect(exit.exitCode).toBe(1);
+    expect(cap.errors.some((e) => e.includes("OAuth callback port 9638 is already in use"))).toBe(
+      true,
+    );
   });
 
   test("happy path: full OAuth login flow", async () => {
@@ -272,7 +303,10 @@ describe("auth login", () => {
     expect(handle.authorizeUrl).toContain("reddit.com/api/v1/authorize");
     const stateMatch = handle.authorizeUrl.match(/state=([^&]+)/);
     expect(stateMatch).not.toBeNull();
-    const state = stateMatch![1];
+    if (!stateMatch) {
+      throw new Error("Authorize URL did not include state");
+    }
+    const state = stateMatch[1];
 
     // Simulate the OAuth callback using real fetch to hit the local server
     const callbackUrl = `http://127.0.0.1:${port}/callback?code=test_auth_code&state=${state}`;
@@ -295,8 +329,8 @@ describe("auth login", () => {
 
   test("authLogin uses --client-id/--client-secret flags and outputs JSON", async () => {
     // Ensure env vars are NOT set — credentials come from flags only
-    delete process.env.REDDIT_CLIENT_ID;
-    delete process.env.REDDIT_CLIENT_SECRET;
+    process.env.REDDIT_CLIENT_ID = undefined;
+    process.env.REDDIT_CLIENT_SECRET = undefined;
 
     const realFetch = globalThis.fetch;
 
@@ -349,15 +383,24 @@ describe("auth login", () => {
     // Extract port and state from the authorize URL
     const stateMatch = authorizeUrl.match(/state=([^&]+)/);
     expect(stateMatch).not.toBeNull();
-    const state = stateMatch![1];
+    if (!stateMatch) {
+      throw new Error("Authorize URL did not include state");
+    }
+    const state = stateMatch[1];
 
     // The redirect URI in the authorize URL tells us the port
     const redirectMatch = authorizeUrl.match(/redirect_uri=([^&]+)/);
     expect(redirectMatch).not.toBeNull();
-    const redirectUri = decodeURIComponent(redirectMatch![1]);
+    if (!redirectMatch) {
+      throw new Error("Authorize URL did not include redirect_uri");
+    }
+    const redirectUri = decodeURIComponent(redirectMatch[1]);
     const portMatch = redirectUri.match(/:(\d+)\//);
     expect(portMatch).not.toBeNull();
-    const port = portMatch![1];
+    if (!portMatch) {
+      throw new Error("redirect_uri did not include a port");
+    }
+    const port = portMatch[1];
 
     // Hit the OAuth callback
     const callbackUrl = `http://127.0.0.1:${port}/callback?code=test_code&state=${state}`;
@@ -374,7 +417,10 @@ describe("auth login", () => {
     // Verify JSON output
     const jsonLine = cap.logs.find((l) => l.includes("authenticated"));
     expect(jsonLine).toBeDefined();
-    const output = JSON.parse(jsonLine!);
+    if (!jsonLine) {
+      throw new Error("authLogin did not emit JSON output");
+    }
+    const output = JSON.parse(jsonLine);
     expect(output.authenticated).toBe(true);
 
     // Verify auth.json was written with correct data
@@ -405,11 +451,11 @@ describe("auth status — human mode", () => {
   afterEach(() => {
     setOutputMode(false, false, false);
     process.env.XDG_CONFIG_HOME = originalEnv.XDG_CONFIG_HOME;
-    if (!originalEnv.XDG_CONFIG_HOME) delete process.env.XDG_CONFIG_HOME;
+    if (!originalEnv.XDG_CONFIG_HOME) process.env.XDG_CONFIG_HOME = undefined;
     if (originalEnv.REDDIT_CLIENT_SECRET !== undefined) {
       process.env.REDDIT_CLIENT_SECRET = originalEnv.REDDIT_CLIENT_SECRET;
     } else {
-      delete process.env.REDDIT_CLIENT_SECRET;
+      process.env.REDDIT_CLIENT_SECRET = undefined;
     }
     rmSync(tempDir, { recursive: true, force: true });
   });
@@ -467,7 +513,7 @@ describe("auth logout — human mode", () => {
   afterEach(() => {
     setOutputMode(false, false, false);
     process.env.XDG_CONFIG_HOME = originalEnv.XDG_CONFIG_HOME;
-    if (!originalEnv.XDG_CONFIG_HOME) delete process.env.XDG_CONFIG_HOME;
+    if (!originalEnv.XDG_CONFIG_HOME) process.env.XDG_CONFIG_HOME = undefined;
     rmSync(tempDir, { recursive: true, force: true });
   });
 

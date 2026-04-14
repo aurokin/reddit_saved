@@ -14,7 +14,7 @@ export async function searchCmd(
   flags: Record<string, string | boolean>,
   positionals: string[],
 ): Promise<void> {
-  const query = positionals[0];
+  const query = positionals.join(" ").trim();
   if (!query) {
     printError("Search query required. Usage: reddit-saved search <query>");
     process.exit(1);

@@ -1,5 +1,23 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { PerformanceMonitor, formatBytes, formatDuration } from "../src/monitor/performance";
+import type { Bottleneck, SyncMetrics } from "../src/types";
+
+function getInternalSyncMetrics(monitor: PerformanceMonitor): SyncMetrics {
+  return (monitor as unknown as { syncMetrics: SyncMetrics }).syncMetrics;
+}
+
+function expectBottleneck(
+  bottlenecks: Bottleneck[],
+  predicate: (bottleneck: Bottleneck) => boolean,
+  message: string,
+): Bottleneck {
+  const bottleneck = bottlenecks.find(predicate);
+  expect(bottleneck).toBeDefined();
+  if (!bottleneck) {
+    throw new Error(message);
+  }
+  return bottleneck;
+}
 
 describe("PerformanceMonitor", () => {
   let monitor: PerformanceMonitor;
@@ -406,14 +424,17 @@ describe("PerformanceMonitor", () => {
     // which computes: duration = endTime - startTime.
     // We set endTime to now and startTime to 60s ago: 15 items / 60s = 0.25 items/sec < 0.5
     // Use private field access to set startTime back
-    (monitor as any).syncMetrics.startTime = Date.now() - 60_000;
+    getInternalSyncMetrics(monitor).startTime = Date.now() - 60_000;
     monitor.endSession();
 
     const bottlenecks = monitor.identifyBottlenecks();
-    const processingBottleneck = bottlenecks.find((b) => b.type === "processing");
-    expect(processingBottleneck).toBeDefined();
-    expect(processingBottleneck!.severity).toBe("medium");
-    expect(processingBottleneck!.description).toContain("items/second");
+    const processingBottleneck = expectBottleneck(
+      bottlenecks,
+      (b) => b.type === "processing",
+      "Expected processing bottleneck",
+    );
+    expect(processingBottleneck.severity).toBe("medium");
+    expect(processingBottleneck.description).toContain("items/second");
   });
 
   test("identifyBottlenecks detects network failure", () => {
@@ -423,9 +444,12 @@ describe("PerformanceMonitor", () => {
     for (let i = 0; i < 2; i++) mon.recordRequest(true, 100);
     mon.endSession();
     const bottlenecks = mon.identifyBottlenecks();
-    const networkBottleneck = bottlenecks.find((b) => b.type === "network");
-    expect(networkBottleneck).toBeDefined();
-    expect(networkBottleneck!.severity).toBe("high");
+    const networkBottleneck = expectBottleneck(
+      bottlenecks,
+      (b) => b.type === "network",
+      "Expected network bottleneck",
+    );
+    expect(networkBottleneck.severity).toBe("high");
   });
 
   test("identifyBottlenecks detects rate limit issues", () => {
@@ -437,9 +461,12 @@ describe("PerformanceMonitor", () => {
     monitor.endSession();
 
     const bottlenecks = monitor.identifyBottlenecks();
-    const rl = bottlenecks.find((b) => b.type === "rate_limit");
-    expect(rl).toBeDefined();
-    expect(rl!.severity).toBe("high");
+    const rateLimitBottleneck = expectBottleneck(
+      bottlenecks,
+      (b) => b.type === "rate_limit",
+      "Expected rate-limit bottleneck",
+    );
+    expect(rateLimitBottleneck.severity).toBe("high");
   });
 
   test("identifyBottlenecks detects high latency", () => {
@@ -449,11 +476,12 @@ describe("PerformanceMonitor", () => {
     monitor.endSession();
 
     const bottlenecks = monitor.identifyBottlenecks();
-    const latency = bottlenecks.find(
+    const latencyBottleneck = expectBottleneck(
+      bottlenecks,
       (b) => b.type === "network" && b.description.includes("response time"),
+      "Expected latency bottleneck",
     );
-    expect(latency).toBeDefined();
-    expect(latency!.severity).toBe("high");
+    expect(latencyBottleneck.severity).toBe("high");
   });
 
   test("formatForDisplay produces non-empty output", () => {
@@ -484,7 +512,7 @@ describe("PerformanceMonitor", () => {
     monitor.recordRateLimitWait(5000);
     for (let i = 0; i < 10; i++) monitor.recordItemProcessed("stored");
     // Manipulate startTime to 10 seconds ago for deterministic rates
-    (monitor as any).syncMetrics.startTime = Date.now() - 10_000;
+    getInternalSyncMetrics(monitor).startTime = Date.now() - 10_000;
     monitor.endSession();
 
     const summary = monitor.getSummary();
@@ -497,7 +525,7 @@ describe("PerformanceMonitor", () => {
     monitor = new PerformanceMonitor();
     monitor.startSession();
     // Duration ~2s, rate limit wait ~1.9s → active time < 1s → floor at 1s
-    (monitor as any).syncMetrics.startTime = Date.now() - 2000;
+    getInternalSyncMetrics(monitor).startTime = Date.now() - 2000;
     monitor.recordRateLimitWait(1900);
     for (let i = 0; i < 5; i++) monitor.recordItemProcessed("stored");
     monitor.endSession();
@@ -517,11 +545,12 @@ describe("PerformanceMonitor", () => {
       monitor.endSession();
 
       const bottlenecks = monitor.identifyBottlenecks();
-      const latency = bottlenecks.find(
+      const latencyBottleneck = expectBottleneck(
+        bottlenecks,
         (b) => b.type === "network" && b.description.includes("response time"),
+        "Expected latency bottleneck",
       );
-      expect(latency).toBeDefined();
-      expect(latency!.severity).toBe("medium");
+      expect(latencyBottleneck.severity).toBe("medium");
     });
 
     test("network medium severity at 88% success rate", () => {
@@ -533,11 +562,12 @@ describe("PerformanceMonitor", () => {
       monitor.endSession();
 
       const bottlenecks = monitor.identifyBottlenecks();
-      const net = bottlenecks.find(
+      const networkBottleneck = expectBottleneck(
+        bottlenecks,
         (b) => b.type === "network" && b.description.includes("failed"),
+        "Expected network bottleneck",
       );
-      expect(net).toBeDefined();
-      expect(net!.severity).toBe("medium");
+      expect(networkBottleneck.severity).toBe("medium");
     });
   });
 
@@ -551,9 +581,12 @@ describe("PerformanceMonitor", () => {
       monitor.endSession();
 
       const bottlenecks = monitor.identifyBottlenecks();
-      const rl = bottlenecks.find((b) => b.type === "rate_limit");
-      expect(rl).toBeDefined();
-      expect(rl!.severity).toBe("low");
+      const rateLimitBottleneck = expectBottleneck(
+        bottlenecks,
+        (b) => b.type === "rate_limit",
+        "Expected rate-limit bottleneck",
+      );
+      expect(rateLimitBottleneck.severity).toBe("low");
     });
 
     test("network low severity at 93% success rate", () => {
@@ -565,11 +598,12 @@ describe("PerformanceMonitor", () => {
       monitor.endSession();
 
       const bottlenecks = monitor.identifyBottlenecks();
-      const net = bottlenecks.find(
+      const networkBottleneck = expectBottleneck(
+        bottlenecks,
         (b) => b.type === "network" && b.description.includes("failed"),
+        "Expected network bottleneck",
       );
-      expect(net).toBeDefined();
-      expect(net!.severity).toBe("low");
+      expect(networkBottleneck.severity).toBe("low");
     });
 
     test("latency low severity at 2500ms avg", () => {
@@ -579,11 +613,12 @@ describe("PerformanceMonitor", () => {
       monitor.endSession();
 
       const bottlenecks = monitor.identifyBottlenecks();
-      const latency = bottlenecks.find(
+      const latencyBottleneck = expectBottleneck(
+        bottlenecks,
         (b) => b.type === "network" && b.description.includes("response time"),
+        "Expected latency bottleneck",
       );
-      expect(latency).toBeDefined();
-      expect(latency!.severity).toBe("low");
+      expect(latencyBottleneck.severity).toBe("low");
     });
   });
 });

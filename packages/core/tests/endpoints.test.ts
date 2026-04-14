@@ -272,21 +272,21 @@ describe("permalink validation", () => {
   });
 
   test("rejects permalink with percent-encoded CRLF", () => {
-    expect(() =>
-      buildCommentsRequest("tok", "/r/test/comments/abc%0D%0Aevil", "ua"),
-    ).toThrow("must not contain");
+    expect(() => buildCommentsRequest("tok", "/r/test/comments/abc%0D%0Aevil", "ua")).toThrow(
+      "must not contain",
+    );
   });
 
   test("rejects permalink with percent-encoded slash", () => {
-    expect(() =>
-      buildCommentsRequest("tok", "/r/test/comments/abc%2Fdef", "ua"),
-    ).toThrow("must not contain");
+    expect(() => buildCommentsRequest("tok", "/r/test/comments/abc%2Fdef", "ua")).toThrow(
+      "must not contain",
+    );
   });
 
   test("rejects permalink with any percent encoding", () => {
-    expect(() =>
-      buildCommentsRequest("tok", "/r/test/comments/abc%20def", "ua"),
-    ).toThrow("must not contain");
+    expect(() => buildCommentsRequest("tok", "/r/test/comments/abc%20def", "ua")).toThrow(
+      "must not contain",
+    );
   });
 
   test("accepts normal permalink without percent encoding", () => {

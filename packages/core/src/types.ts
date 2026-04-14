@@ -527,6 +527,7 @@ export interface StorageAdapter {
   // Sync state (key-value for completed-sync metadata)
   getSyncState(key: string): string | null;
   setSyncState(key: string, value: string): void;
+  deleteSyncState(key: string): void;
 
   // Unsave
   markUnsaved(ids: string[]): void;

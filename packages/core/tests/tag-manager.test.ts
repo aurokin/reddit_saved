@@ -181,7 +181,9 @@ describe("TagManager", () => {
 
   test("addTagToPost throws when post does not exist", () => {
     tags.createTag("rust");
-    expect(() => tags.addTagToPost("rust", "no_such_post")).toThrow('Item "no_such_post" not found');
+    expect(() => tags.addTagToPost("rust", "no_such_post")).toThrow(
+      'Item "no_such_post" not found',
+    );
   });
 
   test("removeTagFromPost throws when tag does not exist", () => {

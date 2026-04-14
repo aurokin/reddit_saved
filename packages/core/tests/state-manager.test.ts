@@ -8,6 +8,22 @@ function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), "reddit-saved-state-test-"));
 }
 
+function makeCheckpointFixture(overrides: Record<string, unknown> = {}, now = Date.now()) {
+  return {
+    sessionId: "ok",
+    contentOrigin: "saved",
+    isFull: false,
+    phase: "fetching",
+    cursor: null,
+    totalFetched: 0,
+    fetchedIds: [],
+    failedIds: [],
+    startedAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
 describe("SyncStateManager", () => {
   let dir: string;
   let checkpointPath: string;
@@ -27,6 +43,8 @@ describe("SyncStateManager", () => {
     const cp = manager.createNew();
     expect(cp.sessionId).toBeDefined();
     expect(cp.sessionId.length).toBeGreaterThan(0);
+    expect(cp.contentOrigin).toBe("saved");
+    expect(cp.isFull).toBe(false);
     expect(cp.cursor).toBeNull();
     expect(cp.fetchedIds).toEqual([]);
     expect(cp.failedIds).toEqual([]);
@@ -41,6 +59,13 @@ describe("SyncStateManager", () => {
     expect(cp.sessionId).toBe("my-session");
   });
 
+  test("createNew accepts checkpoint metadata", () => {
+    const cp = manager.createNew("my-session", { contentOrigin: "upvoted", isFull: true });
+    expect(cp.sessionId).toBe("my-session");
+    expect(cp.contentOrigin).toBe("upvoted");
+    expect(cp.isFull).toBe(true);
+  });
+
   test("save and load round-trips", async () => {
     const cp = manager.createNew("roundtrip-test");
     cp.cursor = "abc_cursor";
@@ -52,6 +77,8 @@ describe("SyncStateManager", () => {
 
     expect(loaded).not.toBeNull();
     expect(loaded?.sessionId).toBe("roundtrip-test");
+    expect(loaded?.contentOrigin).toBe("saved");
+    expect(loaded?.isFull).toBe(false);
     expect(loaded?.cursor).toBe("abc_cursor");
     expect(loaded?.totalFetched).toBe(42);
     expect(loaded?.phase).toBe("storing");
@@ -90,20 +117,29 @@ describe("SyncStateManager", () => {
     expect(await Bun.file(checkpointPath).exists()).toBe(false);
   });
 
+  test("load rejects legacy checkpoints missing contentOrigin and isFull", async () => {
+    const now = Date.now();
+    const {
+      contentOrigin: _contentOrigin,
+      isFull: _isFull,
+      ...legacyCheckpoint
+    } = makeCheckpointFixture(
+      { sessionId: "legacy-session", cursor: "legacy_cursor_123", totalFetched: 7 },
+      now,
+    );
+
+    writeFileSync(checkpointPath, JSON.stringify(legacyCheckpoint));
+
+    const loaded = await manager.load();
+    expect(loaded).toBeNull();
+    expect(await Bun.file(checkpointPath).exists()).toBe(false);
+  });
+
   test("load accepts sessionId at exactly 64 characters", async () => {
     const now = Date.now();
     writeFileSync(
       checkpointPath,
-      JSON.stringify({
-        sessionId: "a".repeat(64),
-        phase: "fetching",
-        cursor: "",
-        totalFetched: 0,
-        fetchedIds: [],
-        failedIds: [],
-        startedAt: now,
-        updatedAt: now,
-      }),
+      JSON.stringify(makeCheckpointFixture({ sessionId: "a".repeat(64), cursor: "" }, now)),
     );
     const loaded = await manager.load();
     expect(loaded).not.toBeNull();
@@ -113,16 +149,7 @@ describe("SyncStateManager", () => {
   test("load rejects sessionId exceeding 64 characters", async () => {
     writeFileSync(
       checkpointPath,
-      JSON.stringify({
-        sessionId: "a".repeat(65),
-        phase: "fetching",
-        cursor: "",
-        totalFetched: 0,
-        fetchedIds: [],
-        failedIds: [],
-        startedAt: Date.now(),
-        updatedAt: Date.now(),
-      }),
+      JSON.stringify(makeCheckpointFixture({ sessionId: "a".repeat(65), cursor: "" })),
     );
     const loaded = await manager.load();
     expect(loaded).toBeNull();
@@ -132,16 +159,7 @@ describe("SyncStateManager", () => {
   test("load rejects negative totalFetched", async () => {
     writeFileSync(
       checkpointPath,
-      JSON.stringify({
-        sessionId: "ok",
-        phase: "fetching",
-        cursor: "",
-        totalFetched: -1,
-        fetchedIds: [],
-        failedIds: [],
-        startedAt: Date.now(),
-        updatedAt: Date.now(),
-      }),
+      JSON.stringify(makeCheckpointFixture({ cursor: "", totalFetched: -1 })),
     );
     const loaded = await manager.load();
     expect(loaded).toBeNull();
@@ -230,16 +248,17 @@ describe("SyncStateManager", () => {
     const now = Date.now();
     writeFileSync(
       checkpointPath,
-      JSON.stringify({
-        sessionId: "external",
-        phase: "fetching",
-        cursor: null,
-        totalFetched: 5,
-        fetchedIds: ["a", "b", "c"],
-        failedIds: ["d"],
-        startedAt: now,
-        updatedAt: now,
-      }),
+      JSON.stringify(
+        makeCheckpointFixture(
+          {
+            sessionId: "external",
+            totalFetched: 5,
+            fetchedIds: ["a", "b", "c"],
+            failedIds: ["d"],
+          },
+          now,
+        ),
+      ),
     );
     const loaded = await manager.load();
     expect(loaded).not.toBeNull();
@@ -273,19 +292,7 @@ describe("SyncStateManager", () => {
 
   test("load rejects startedAt: 0", async () => {
     const now = Date.now();
-    writeFileSync(
-      checkpointPath,
-      JSON.stringify({
-        sessionId: "ok",
-        phase: "fetching",
-        cursor: null,
-        totalFetched: 0,
-        fetchedIds: [],
-        failedIds: [],
-        startedAt: 0,
-        updatedAt: now,
-      }),
-    );
+    writeFileSync(checkpointPath, JSON.stringify(makeCheckpointFixture({ startedAt: 0 }, now)));
     const loaded = await manager.load();
     expect(loaded).toBeNull();
     expect(await Bun.file(checkpointPath).exists()).toBe(false);
@@ -293,19 +300,7 @@ describe("SyncStateManager", () => {
 
   test("load rejects updatedAt: 0", async () => {
     const now = Date.now();
-    writeFileSync(
-      checkpointPath,
-      JSON.stringify({
-        sessionId: "ok",
-        phase: "fetching",
-        cursor: null,
-        totalFetched: 0,
-        fetchedIds: [],
-        failedIds: [],
-        startedAt: now,
-        updatedAt: 0,
-      }),
-    );
+    writeFileSync(checkpointPath, JSON.stringify(makeCheckpointFixture({ updatedAt: 0 }, now)));
     const loaded = await manager.load();
     expect(loaded).toBeNull();
     expect(await Bun.file(checkpointPath).exists()).toBe(false);
@@ -313,19 +308,7 @@ describe("SyncStateManager", () => {
 
   test("load rejects non-integer updatedAt", async () => {
     const now = Date.now();
-    writeFileSync(
-      checkpointPath,
-      JSON.stringify({
-        sessionId: "ok",
-        phase: "fetching",
-        cursor: null,
-        totalFetched: 0,
-        fetchedIds: [],
-        failedIds: [],
-        startedAt: now,
-        updatedAt: 1.5,
-      }),
-    );
+    writeFileSync(checkpointPath, JSON.stringify(makeCheckpointFixture({ updatedAt: 1.5 }, now)));
     const loaded = await manager.load();
     expect(loaded).toBeNull();
     expect(await Bun.file(checkpointPath).exists()).toBe(false);
@@ -335,16 +318,7 @@ describe("SyncStateManager", () => {
     const now = Date.now();
     writeFileSync(
       checkpointPath,
-      JSON.stringify({
-        sessionId: "ok",
-        phase: "fetching",
-        cursor: null,
-        totalFetched: 0,
-        fetchedIds: "not-array",
-        failedIds: [],
-        startedAt: now,
-        updatedAt: now,
-      }),
+      JSON.stringify(makeCheckpointFixture({ fetchedIds: "not-array" }, now)),
     );
     const loaded = await manager.load();
     expect(loaded).toBeNull();
@@ -355,16 +329,7 @@ describe("SyncStateManager", () => {
     const now = Date.now();
     writeFileSync(
       checkpointPath,
-      JSON.stringify({
-        sessionId: "ok",
-        phase: "fetching",
-        cursor: "x".repeat(201),
-        totalFetched: 0,
-        fetchedIds: [],
-        failedIds: [],
-        startedAt: now,
-        updatedAt: now,
-      }),
+      JSON.stringify(makeCheckpointFixture({ cursor: "x".repeat(201) }, now)),
     );
     const loaded = await manager.load();
     expect(loaded).toBeNull();
@@ -374,16 +339,7 @@ describe("SyncStateManager", () => {
     const now = Date.now();
     writeFileSync(
       checkpointPath,
-      JSON.stringify({
-        sessionId: "ok",
-        phase: "fetching",
-        cursor: "x".repeat(200),
-        totalFetched: 0,
-        fetchedIds: [],
-        failedIds: [],
-        startedAt: now,
-        updatedAt: now,
-      }),
+      JSON.stringify(makeCheckpointFixture({ cursor: "x".repeat(200) }, now)),
     );
     const loaded = await manager.load();
     expect(loaded).not.toBeNull();
@@ -393,16 +349,12 @@ describe("SyncStateManager", () => {
     const now = Date.now();
     writeFileSync(
       checkpointPath,
-      JSON.stringify({
-        sessionId: "ok",
-        phase: "fetching",
-        cursor: null,
-        totalFetched: 0,
-        fetchedIds: Array.from({ length: 10001 }, (_, i) => `id${i}`),
-        failedIds: [],
-        startedAt: now,
-        updatedAt: now,
-      }),
+      JSON.stringify(
+        makeCheckpointFixture(
+          { fetchedIds: Array.from({ length: 10001 }, (_, i) => `id${i}`) },
+          now,
+        ),
+      ),
     );
     const loaded = await manager.load();
     expect(loaded).toBeNull();
@@ -412,16 +364,7 @@ describe("SyncStateManager", () => {
     const now = Date.now();
     writeFileSync(
       checkpointPath,
-      JSON.stringify({
-        sessionId: "ok",
-        phase: "fetching",
-        cursor: null,
-        totalFetched: 0,
-        fetchedIds: ["a".repeat(21)],
-        failedIds: [],
-        startedAt: now,
-        updatedAt: now,
-      }),
+      JSON.stringify(makeCheckpointFixture({ fetchedIds: ["a".repeat(21)] }, now)),
     );
     const loaded = await manager.load();
     expect(loaded).toBeNull();
@@ -431,16 +374,7 @@ describe("SyncStateManager", () => {
     const now = Date.now();
     writeFileSync(
       checkpointPath,
-      JSON.stringify({
-        sessionId: "ok",
-        phase: "invalid_phase",
-        cursor: null,
-        totalFetched: 0,
-        fetchedIds: [],
-        failedIds: [],
-        startedAt: now,
-        updatedAt: now,
-      }),
+      JSON.stringify(makeCheckpointFixture({ phase: "invalid_phase" }, now)),
     );
     const loaded = await manager.load();
     expect(loaded).toBeNull();
@@ -453,23 +387,22 @@ describe("SyncStateManager", () => {
     await manager.save(cp);
     const loaded = await manager.load();
     expect(loaded).not.toBeNull();
-    expect(loaded!.cursor).toBeNull();
+    if (!loaded) {
+      throw new Error("Expected checkpoint to load");
+    }
+    expect(loaded.cursor).toBeNull();
   });
 
   test("load rejects failedIds exceeding 10000 entries", async () => {
     const now = Date.now();
     writeFileSync(
       checkpointPath,
-      JSON.stringify({
-        sessionId: "ok",
-        phase: "fetching",
-        cursor: null,
-        totalFetched: 0,
-        fetchedIds: [],
-        failedIds: Array.from({ length: 10001 }, (_, i) => `id${i}`),
-        startedAt: now,
-        updatedAt: now,
-      }),
+      JSON.stringify(
+        makeCheckpointFixture(
+          { failedIds: Array.from({ length: 10001 }, (_, i) => `id${i}`) },
+          now,
+        ),
+      ),
     );
     const loaded = await manager.load();
     expect(loaded).toBeNull();
@@ -480,16 +413,7 @@ describe("SyncStateManager", () => {
     const now = Date.now();
     writeFileSync(
       checkpointPath,
-      JSON.stringify({
-        sessionId: "ok",
-        phase: "fetching",
-        cursor: null,
-        totalFetched: 0,
-        fetchedIds: [],
-        failedIds: ["a".repeat(21)],
-        startedAt: now,
-        updatedAt: now,
-      }),
+      JSON.stringify(makeCheckpointFixture({ failedIds: ["a".repeat(21)] }, now)),
     );
     const loaded = await manager.load();
     expect(loaded).toBeNull();
@@ -500,16 +424,7 @@ describe("SyncStateManager", () => {
     const now = Date.now();
     writeFileSync(
       checkpointPath,
-      JSON.stringify({
-        sessionId: "ok",
-        phase: "fetching",
-        cursor: null,
-        totalFetched: 1.5,
-        fetchedIds: [],
-        failedIds: [],
-        startedAt: now,
-        updatedAt: now,
-      }),
+      JSON.stringify(makeCheckpointFixture({ totalFetched: 1.5 }, now)),
     );
     const loaded = await manager.load();
     expect(loaded).toBeNull();
@@ -551,10 +466,13 @@ describe("SyncStateManager", () => {
 
     const loaded = await manager.load();
     expect(loaded).not.toBeNull();
+    if (!loaded) {
+      throw new Error("Expected checkpoint to load");
+    }
     // Second save should win since saves are serialized
-    expect(loaded!.sessionId).toBe("session-2");
-    expect(loaded!.cursor).toBe("cursor-2");
-    expect(loaded!.totalFetched).toBe(20);
+    expect(loaded.sessionId).toBe("session-2");
+    expect(loaded.cursor).toBe("cursor-2");
+    expect(loaded.totalFetched).toBe(20);
   });
 
   test("multiple rapid saves all complete without data corruption", async () => {
@@ -570,10 +488,13 @@ describe("SyncStateManager", () => {
 
     const loaded = await manager.load();
     expect(loaded).not.toBeNull();
+    if (!loaded) {
+      throw new Error("Expected checkpoint to load");
+    }
     // Last save should win
-    expect(loaded!.sessionId).toBe("session-4");
-    expect(loaded!.cursor).toBe("cursor-4");
-    expect(loaded!.totalFetched).toBe(40);
+    expect(loaded.sessionId).toBe("session-4");
+    expect(loaded.cursor).toBe("cursor-4");
+    expect(loaded.totalFetched).toBe(40);
   });
 
   test("onSaveError callback fires when a subsequent save follows a failed one", async () => {
@@ -610,7 +531,10 @@ describe("SyncStateManager", () => {
 
     const loaded = await errorManager.load();
     expect(loaded).not.toBeNull();
-    expect(loaded!.sessionId).toBe("session-recover");
+    if (!loaded) {
+      throw new Error("Expected checkpoint to load");
+    }
+    expect(loaded.sessionId).toBe("session-recover");
 
     rmSync(tempDir, { recursive: true, force: true });
   });
@@ -621,7 +545,10 @@ describe("SyncStateManager", () => {
     await noCallbackManager.save(cp);
     const loaded = await noCallbackManager.load();
     expect(loaded).not.toBeNull();
-    expect(loaded!.sessionId).toBe("session-no-cb");
+    if (!loaded) {
+      throw new Error("Expected checkpoint to load");
+    }
+    expect(loaded.sessionId).toBe("session-no-cb");
   });
 
   test("console.warn fires when save fails without onSaveError callback", async () => {

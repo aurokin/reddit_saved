@@ -287,7 +287,10 @@ describe("printTable", () => {
     const cap = captureConsole();
     try {
       printTable(
-        [{ name: "Alice", age: 30 }, { name: "Bob", age: 25 }],
+        [
+          { name: "Alice", age: 30 },
+          { name: "Bob", age: 25 },
+        ],
         [
           { key: "name", header: "Name", width: 10 },
           { key: "age", header: "Age", width: 5, align: "right" },
