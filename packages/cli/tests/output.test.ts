@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  SEARCH_SNIPPET_HIGHLIGHT_END,
+  SEARCH_SNIPPET_HIGHLIGHT_START,
+} from "@reddit-saved/core";
+import {
   formatPostForOutput,
   isHumanMode,
   printError,
@@ -119,7 +123,7 @@ describe("formatPostForOutput", () => {
       score: 0,
       permalink: "/p",
       created_utc: 0,
-      snippet: "matched <b>text</b>",
+      snippet: `matched ${SEARCH_SNIPPET_HIGHLIGHT_START}text${SEARCH_SNIPPET_HIGHLIGHT_END}`,
     });
     expect(result.snippet).toBe("matched <b>text</b>");
   });

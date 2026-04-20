@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import {
+  SEARCH_SNIPPET_HIGHLIGHT_END,
+  SEARCH_SNIPPET_HIGHLIGHT_START,
+} from "../src/constants";
 import { SqliteAdapter } from "../src/storage/sqlite-adapter";
 import { TagManager } from "../src/tags/tag-manager";
 import type { RedditItem } from "../src/types";
@@ -121,6 +125,9 @@ describe("SqliteAdapter", () => {
     expect(results.length).toBe(1);
     expect(results[0].title).toBe("Learning Rust programming");
     expect(results[0].snippet).toBeDefined();
+    expect(results[0].snippet.includes(SEARCH_SNIPPET_HIGHLIGHT_START)).toBe(true);
+    expect(results[0].snippet.includes(SEARCH_SNIPPET_HIGHLIGHT_END)).toBe(true);
+    expect(results[0].snippet.includes("<b>")).toBe(false);
   });
 
   test("markOrphaned sets is_on_reddit to 0 only for old items", () => {
@@ -286,6 +293,71 @@ describe("SqliteAdapter", () => {
     const page2 = adapter.listPosts({ sort: "score", sortDirection: "desc", limit: 2, offset: 2 });
     expect(page2.length).toBe(2);
     expect(page2.map((r) => r.id)).toEqual(["b", "a"]);
+  });
+
+  test("countPosts matches list filters but ignores pagination", () => {
+    const tags = new TagManager(adapter.getDb());
+    adapter.upsertPosts(
+      [
+        makeItem({ id: "a", subreddit: "rust", score: 10 }),
+        makeItem({ id: "b", subreddit: "rust", score: 20 }),
+        makeItem({ id: "c", subreddit: "python", score: 30 }),
+      ],
+      "saved",
+    );
+
+    tags.createTag("favorite");
+    tags.addTagToPost("favorite", "a");
+    tags.addTagToPost("favorite", "b");
+
+    const total = adapter.countPosts({ subreddit: "rust", tag: "favorite", limit: 1, offset: 1 });
+    expect(total).toBe(2);
+  });
+
+  test("countPosts honors orphaned filters", () => {
+    adapter.upsertPosts([makeItem({ id: "a" }), makeItem({ id: "b" })], "saved");
+    adapter.markUnsaved(["b"]);
+
+    expect(adapter.countPosts({})).toBe(1);
+    expect(adapter.countPosts({ orphaned: true })).toBe(1);
+    expect(adapter.countPosts({ orphaned: "all" })).toBe(2);
+  });
+
+  test("countSearchPosts matches search filters but ignores pagination", () => {
+    const tags = new TagManager(adapter.getDb());
+    adapter.upsertPosts(
+      [
+        makeItem({ id: "a", title: "rust tips", subreddit: "rust" }),
+        makeItem({ id: "b", title: "rust patterns", subreddit: "rust" }),
+        makeItem({ id: "c", title: "python tips", subreddit: "python" }),
+      ],
+      "saved",
+    );
+
+    tags.createTag("favorite");
+    tags.addTagToPost("favorite", "a");
+    tags.addTagToPost("favorite", "b");
+
+    const total = adapter.countSearchPosts("rust", {
+      subreddit: "rust",
+      tag: "favorite",
+      limit: 1,
+      offset: 1,
+    });
+    expect(total).toBe(2);
+  });
+
+  test("searchPosts and countSearchPosts filter by contentOrigin", () => {
+    adapter.upsertPosts([makeItem({ id: "saved1", title: "rust patterns" })], "saved");
+    adapter.upsertPosts([makeItem({ id: "upvoted1", title: "rust patterns" })], "upvoted");
+
+    const savedResults = adapter.searchPosts("rust", { contentOrigin: "saved" });
+    const upvotedResults = adapter.searchPosts("rust", { contentOrigin: "upvoted" });
+
+    expect(savedResults.map((row) => row.id)).toEqual(["saved1"]);
+    expect(upvotedResults.map((row) => row.id)).toEqual(["upvoted1"]);
+    expect(adapter.countSearchPosts("rust", { contentOrigin: "saved" })).toBe(1);
+    expect(adapter.countSearchPosts("rust", { contentOrigin: "upvoted" })).toBe(1);
   });
 
   test("getPost includes tags via GROUP_CONCAT join", () => {

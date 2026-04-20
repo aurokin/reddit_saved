@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Reddit Saved</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-size: 13px;
+      }
+      body {
+        margin: 0;
+        padding: 12px;
+        width: 280px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        margin: 4px 0;
+      }
+      .label {
+        color: #888;
+        flex: 0 0 70px;
+      }
+      .value {
+        flex: 1;
+        word-break: break-word;
+      }
+      .ok {
+        color: #2a8a3a;
+      }
+      .err {
+        color: #b91c1c;
+      }
+      button {
+        margin-top: 10px;
+        padding: 6px 12px;
+        font-size: 13px;
+        cursor: pointer;
+        border: 1px solid #ccc;
+        background: #fafafa;
+        border-radius: 4px;
+        width: 100%;
+      }
+      button:hover {
+        background: #f0f0f0;
+      }
+      .small {
+        color: #888;
+        font-size: 11px;
+        margin-top: 8px;
+        line-height: 1.4;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Reddit Saved companion</h1>
+    <div class="row">
+      <span class="label">Status</span>
+      <span class="value" id="status">Loading…</span>
+    </div>
+    <div class="row">
+      <span class="label">User</span>
+      <span class="value" id="user">—</span>
+    </div>
+    <div class="row">
+      <span class="label">Endpoint</span>
+      <span class="value" id="endpoint">—</span>
+    </div>
+    <div class="row">
+      <span class="label">App URL</span>
+      <input class="value" id="app-url" placeholder="http://localhost:3001" />
+    </div>
+    <div class="row">
+      <span class="label">Last sync</span>
+      <span class="value" id="ts">—</span>
+    </div>
+    <button id="save">Save app URL</button>
+    <button id="sync">Sync now</button>
+    <p class="small">
+      Set the local app URL here if the server is not listening on the default port.
+      Your reddit.com cookies are sent only to localhost or 127.0.0.1.
+    </p>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

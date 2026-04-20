@@ -33,6 +33,10 @@ export type {
   UnsaveResult,
   // Auth types
   AuthSettings,
+  AuthContext,
+  AuthProvider,
+  SessionPayload,
+  SessionSettings,
   // Storage types
   PostRow,
   ListOptions,
@@ -95,6 +99,8 @@ export {
   CONTENT_ORIGIN_SUBMITTED,
   CONTENT_ORIGIN_COMMENTED,
   CONTENT_ORIGINS,
+  SEARCH_SNIPPET_HIGHLIGHT_START,
+  SEARCH_SNIPPET_HIGHLIGHT_END,
   COMMENT_MAX_TOP_LEVEL,
   COMMENT_MAX_DEPTH,
   COMMENT_CONTEXT_MAX,
@@ -111,6 +117,7 @@ export type { AuthorizeUrlParams } from "./auth/oauth-urls";
 export { createPendingState, validateState } from "./auth/oauth-state";
 export type { OAuthPendingState } from "./auth/oauth-state";
 export { TokenManager } from "./auth/token-manager";
+export { SessionManager } from "./auth/session-manager";
 export { startOAuthServer } from "./auth/oauth-server";
 export type { OAuthServerOptions, OAuthServerHandle } from "./auth/oauth-server";
 
@@ -166,6 +173,6 @@ export { FILTER_PRESETS } from "./filters/presets";
 export { PerformanceMonitor, formatDuration, formatBytes } from "./monitor/performance";
 
 // Utilities
-export { paths } from "./utils/paths";
+export { getCheckpointPathForDatabase, paths } from "./utils/paths";
 export { decodeHtmlEntities, escapeHtml } from "./utils/html-escape";
 export { sanitizeFilename } from "./utils/file-sanitizer";

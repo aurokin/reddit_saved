@@ -1,5 +1,5 @@
 import { homedir, platform } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 const APP_NAME = "reddit-saved";
 const CUSTOM_CONFIG_DIR_ENV = "REDDIT_SAVED_CONFIG_DIR";
@@ -52,6 +52,14 @@ export const paths = {
   get authLock() {
     return join(getConfigDir(), "auth.lock");
   },
+  /** Full path to session credentials file (cookies forwarded by the browser extension) */
+  get sessionFile() {
+    return join(getConfigDir(), "session.json");
+  },
+  /** Full path to the companion disconnect marker file. */
+  get sessionBlockFile() {
+    return join(getConfigDir(), "session.blocked.json");
+  },
   /** Full path to SQLite database */
   get database() {
     return join(getDataDir(), "reddit-saved.db");
@@ -61,3 +69,7 @@ export const paths = {
     return join(getDataDir(), ".reddit-import-checkpoint.json");
   },
 };
+
+export function getCheckpointPathForDatabase(dbPath: string): string {
+  return join(dirname(dbPath), ".reddit-import-checkpoint.json");
+}

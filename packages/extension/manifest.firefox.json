@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Reddit Saved (companion)",
+  "short_name": "RedditSaved",
+  "version": "0.1.0",
+  "description": "Forwards your reddit.com session to the local Reddit Saved app on localhost.",
+  "permissions": ["cookies", "storage", "alarms", "activeTab"],
+  "host_permissions": ["*://*.reddit.com/*", "http://localhost/*", "http://127.0.0.1/*"],
+  "background": {
+    "scripts": ["background.js"],
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Reddit Saved",
+    "default_popup": "popup.html"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "reddit-saved-companion@local",
+      "strict_min_version": "121.0"
+    }
+  }
+}

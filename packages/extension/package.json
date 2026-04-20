@@ -1,0 +1,11 @@
+{
+  "name": "@reddit-saved/extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser extension that forwards reddit.com session cookies to the local Reddit Saved app.",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "package:chrome": "npm run build && cd dist/chrome && zip -r ../reddit-saved-chrome.zip .",
+    "package:firefox": "npm run build && cd dist/firefox && zip -r ../reddit-saved-firefox.zip ."
+  }
+}

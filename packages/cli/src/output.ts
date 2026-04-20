@@ -5,6 +5,11 @@
  * Human mode (--human/-H): tables and readable text to stdout, progress to stderr.
  */
 
+import {
+  SEARCH_SNIPPET_HIGHLIGHT_END,
+  SEARCH_SNIPPET_HIGHLIGHT_START,
+} from "@reddit-saved/core";
+
 let _isHuman = false;
 let _isVerbose = false;
 let _isQuiet = false;
@@ -165,6 +170,12 @@ export interface PostSummary {
   snippet?: string;
 }
 
+function formatSnippetForOutput(snippet: string): string {
+  return snippet
+    .replaceAll(SEARCH_SNIPPET_HIGHLIGHT_START, "<b>")
+    .replaceAll(SEARCH_SNIPPET_HIGHLIGHT_END, "</b>");
+}
+
 /** Format a PostRow into a summary suitable for JSON output */
 export function formatPostForOutput(row: {
   id: string;
@@ -190,7 +201,7 @@ export function formatPostForOutput(row: {
     permalink: `https://reddit.com${row.permalink}`,
     created_utc: row.created_utc,
     ...(row.tags ? { tags: row.tags } : {}),
-    ...(row.snippet ? { snippet: row.snippet } : {}),
+    ...(row.snippet ? { snippet: formatSnippetForOutput(row.snippet) } : {}),
   };
 }
 

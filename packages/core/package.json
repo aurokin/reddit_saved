@@ -10,10 +10,16 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./search-snippet": {
+      "bun": "./src/search-snippet.ts",
+      "import": "./dist/search-snippet.js",
+      "types": "./dist/search-snippet.d.ts",
+      "default": "./src/search-snippet.ts"
     }
   },
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --target bun && bunx tsc -p tsconfig.json --emitDeclarationOnly",
+    "build": "bun build ./src/index.ts ./src/search-snippet.ts --outdir ./dist --target bun && bunx tsc -p tsconfig.json --emitDeclarationOnly",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit"
   },

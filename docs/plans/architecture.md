@@ -66,11 +66,32 @@ reddit-saved/
 │   │   │   └── commands/              # fetch, search, list, export, status, unsave, tag
 │   │   └── tests/
 │   │
-│   └── web/                           # @reddit-saved/web (package scaffold only)
+│   └── web/                           # @reddit-saved/web (SPA + API)
 │       ├── package.json
 │       ├── tsconfig.json
-│       └── src/
-│           └── index.ts               # Placeholder entry; app not implemented yet
+│       ├── vite.config.ts
+│       ├── index.html                 # SPA entry (inline dark-mode FOUC script)
+│       ├── components.json            # shadcn config
+│       ├── playwright.config.ts
+│       ├── bunfig.toml                # test preload for happy-dom
+│       ├── scripts/seed.ts            # 200-item deterministic fixture
+│       ├── src/
+│       │   ├── main.tsx               # React root + QueryClient + Router
+│       │   ├── router.tsx             # TanStack Router (code-based, search-schema)
+│       │   ├── styles/globals.css     # Tailwind v4 + tokens
+│       │   ├── api/                   # Hono on Bun.serve()
+│       │   │   ├── server.ts
+│       │   │   ├── context.ts         # Singleton core bootstrap (storage/tags/oauth/client)
+│       │   │   ├── middleware.ts      # CSP, logger, error handler
+│       │   │   └── routes/            # auth, posts, tags, sync (SSE), export
+│       │   ├── pages/                 # RootLayout + Home/Browse/Post/Settings/Login
+│       │   ├── components/            # PostCard, PostList, FilterPanel, SyncStatus, etc.
+│       │   ├── components/ui/         # shadcn primitives (hand-rolled)
+│       │   ├── hooks/queries.ts       # React Query + SSE hooks
+│       │   ├── lib/                   # api-client, query-client, utils
+│       │   └── types.ts               # Re-export core + web DTOs
+│       └── tests/                     # bun test + happy-dom + @testing-library
+│           └── e2e/                   # Playwright smoke tests
 ```
 
 ## Key Design Decisions
@@ -79,9 +100,9 @@ reddit-saved/
 |---|---|---|
 | Storage | SQLite via `bun:sqlite` | Zero deps, FTS5 for search, single-file portable |
 | Search | FTS5 with `porter unicode61` tokenizer, BM25 ranking | Covers title/selftext/body/subreddit/author. Tag-filtered search is implemented with tag subqueries/`EXISTS` to avoid FTS5 auxiliary-function constraints. Sufficient for <=1000 items |
-| Auth | Single Reddit **"web app"** (requires client_secret), with CLI OAuth implemented on `localhost:9638`. `TokenManager` in core handles exchange/refresh. File-lock (`auth.lock`) prevents concurrent token refresh races. | Reddit allows only ONE redirect URI per app. "Web app" type chosen because localhost redirect requires client_secret. The CLI flow is implemented now; the same callback can be reused by a future web surface |
+| Auth | Two interchangeable providers behind a common `AuthProvider` interface: (1) **session-cookie pass-through** via the companion browser extension (default) — `SessionManager` ingests cookies + `x-modhash` POSTed to `/api/auth/session` and presents them as `Cookie`-mode auth on `www.reddit.com/.json`; (2) **OAuth** via `TokenManager` for users with a registered Reddit app, on `oauth.reddit.com`. A `CompositeAuthProvider` in `web/src/api/context.ts` picks Session first, OAuth fallback. Endpoints (`api/endpoints.ts`) consume an `AuthContext` and never branch on the underlying mode. | See [ADR 0001](../adr/0001-cookie-session-auth.md) for the full rationale: Reddit closed self-service app registration in 2024, Devvit lacks the per-user listing endpoints this tool needs, and a sideloaded extension is the cheapest way to give new installs a working credential. OAuth is kept for legacy users. |
 | CLI output | JSON to stdout (default), `--human` flag for tables | Agent-first, composable with jq/pipes. Errors to stderr |
-| Web | React 19 SPA (Vite) + Bun.serve() API on :3001 | Planned architecture only. The `@reddit-saved/web` package exists, but the app/server files are not implemented yet |
+| Web | React 19 SPA (Vite) + Hono on Bun.serve() API on :3001 | TanStack Router (code-based) + TanStack Query + TanStack Virtual; Tailwind v4 + shadcn/ui (hand-rolled to avoid npx network calls); SSE for sync progress so `EventSource` can stream it; `TEST_MODE` env disables Reddit writes and OAuth for local dev/Playwright |
 | Config/data paths | Platform-aware: Linux `$XDG_CONFIG_HOME` / `$XDG_DATA_HOME` (fallback `~/.config`, `~/.local/share`), macOS `~/Library/Application Support`, Windows `%APPDATA%`. Subdirectory: `reddit-saved/` | Cross-platform via a `paths.ts` utility in core |
 | Formatter | Biome | Faster than ESLint+Prettier, single tool |
 | Tags | Custom tags in SQLite (local-only, not synced to Reddit) | Reddit API has no tag/label support; local tags enable user-defined grouping and filtering |
@@ -109,7 +130,7 @@ reddit-saved/
 - SQLite storage layer (schema, adapter, FTS5 triggers, migrations)
 - Tag system (tag-manager.ts — CRUD, post-tag associations, tag-filtered search)
 - Entire CLI (arg parsing, commands, output formatting, OAuth server)
-- Web package scaffold only (dependencies/scripts are present; app/server implementation is still Phase 4 work)
+- Web SPA + API server (Hono on Bun.serve, React 19 + Vite, TanStack Router/Query/Virtual, Tailwind v4, hand-rolled shadcn primitives)
 
 ## SQLite Schema
 
@@ -414,7 +435,26 @@ ORDER BY bm25(posts_fts);
 
 ### Auth storage
 
-`auth.json` (in platform-appropriate config dir) stores:
+The app supports two on-disk credential files. Either can be active; if both
+exist, `CompositeAuthProvider` prefers the session.
+
+**Session mode (default)** — `session.json` (mode 0600) stores the cookie
+payload posted by the companion extension:
+```json
+{
+  "cookieHeader": "reddit_session=...; loid=...; ...",
+  "userAgent": "Mozilla/5.0 ...",
+  "modhash": "abc123...",
+  "username": "auro",
+  "capturedAt": 1712345678000
+}
+```
+- **`cookieHeader`** is treated as a credential — never returned in API responses (`getSummary()` redacts it).
+- **`modhash`** is Reddit's CSRF token, required for state-changing requests like `/api/unsave`. Refreshed by the extension on every sync and again by `SessionManager.verify()`.
+- **`userAgent`** mirrors the real browser UA so the request looks like the same client that captured the cookies.
+- **Atomic write**: `mkdirSync` (mode 0700) → `writeFileSync(tmp, ..., {mode: 0o600})` → `renameSync(tmp, sessionFile)`.
+
+**OAuth mode (legacy)** — `auth.json` stores tokens for users with a registered Reddit app:
 ```json
 {
   "accessToken": "...",
@@ -446,6 +486,34 @@ During the OAuth flow, the `:9638` callback server stores the CSRF state in clos
 2. Store `{ state, expiresAt: Date.now() + 10min, returnTo?: string }` in a `Map` inside the server closure
 3. On callback, validate state matches and hasn't expired
 4. If `returnTo` is set (web-initiated), redirect browser there after writing auth.json
+
+### Companion extension flow (cookie/session mode)
+
+`packages/extension/` ships browser-specific MV3 manifests: the repo-root
+`manifest.json` is Chrome-valid (`background.service_worker`), and the Firefox
+build swaps in `manifest.firefox.json` (`background.scripts`) while reusing the
+same `background.js` via `globalThis.browser ?? globalThis.chrome`.
+
+1. On install, on browser start, every 30 min via `chrome.alarms`, and whenever
+   reddit.com cookies change (immediately, with a 30-second alarm fallback if
+   the MV3 worker is suspended), the extension:
+   - Reads the reddit.com cookie jar via `chrome.cookies.getAll`.
+   - Calls `GET https://www.reddit.com/api/me.json` with that cookie + the live
+     `navigator.userAgent` to capture `username` and a fresh `modhash`.
+   - POSTs `{cookies, cookieHeader, userAgent, modhash, username, capturedAt}`
+     to `http://localhost:3001/api/auth/session` (falls back to `127.0.0.1`).
+2. The Hono route validates the payload shape, verifies the request origin is
+   either a `chrome-extension://` / `moz-extension://` URL or a same-host caller
+   (the server already binds 127.0.0.1, so external attackers can't reach it),
+   then calls `SessionManager.ingest(payload)` to atomically write
+   `session.json`.
+3. The next API call any route makes triggers `CompositeAuthProvider.ensureValid()`,
+   which lazy-loads `session.json` if not already in memory, then resolves to a
+   `Cookie`-mode `AuthContext` (baseUrl `https://www.reddit.com`, pathSuffix
+   `.json`, headers include `Cookie` + `User-Agent` + optional `x-modhash`).
+4. **Disconnect**: `DELETE /api/auth/session` clears the in-memory state and
+   `unlinkSync`s `session.json`. The user must also remove the extension to
+   stop new posts.
 
 ### Planned web auth return flow (Phase 4)
 
@@ -533,19 +601,26 @@ Exit codes: 0=success, 1=error, 2=auth required
 5. `export` + `unsave` (unsave requires --confirm)
 6. Tests
 
-### Phase 4: Web
-1. Scaffold Vite + React 19 + Tailwind v4
-2. Bun.serve() API server + auth/posts/sync/export/tag routes. In production, serve Vite-built `index.html` as fallback for any non-`/api/*` and non-static-asset request (SPA client-side routing support)
-3. SPA pages (Home, Browse, Post, Settings)
-4. Components (PostCard, SearchBar, FilterPanel, TagChips, TagManager, SyncStatus)
-5. Tests
+### Phase 4: Web (implemented)
+1. Scaffolded Vite + React 19 + Tailwind v4, TanStack Router/Query/Virtual, Radix primitives
+2. Hono API server on :3001 with `auth`, `posts`, `posts/search`, `tags`, `sync/fetch` (SSE), `sync/status`, `sync/cancel`, `unsave`, `export`, `health` routes. In production, serves the Vite build output and falls back to `index.html` for non-`/api/*` and non-asset paths (SPA client-side routing). CSP allowlists Reddit CDN hosts (`i.redd.it`, `v.redd.it`, `preview.redd.it`, `external-preview.redd.it`, `*.thumbs.redditmedia.com`)
+3. `TEST_MODE=1` env disables Reddit writes, stubs OAuth, and short-circuits `unsave` — refuses to run under `NODE_ENV=production`
+4. SSE via Hono's `streamSSE` for sync progress; client uses `EventSource` (GET). `RedditApiClient` exposes `setCallbacks`/`getCallbacks` so the SSE route can swap in stream-routing callbacks without touching private state
+5. SPA pages: `RootLayout` (topbar, dark toggle, sync indicator), `HomePage`, `BrowsePage` (URL-synced filters via router `validateSearch`), `PostPage` (MediaEmbed, TagEditor, confirm-gated unsave), `SettingsPage` (auth, sync, export, TagManager), `LoginPage` (polled auth status during OAuth)
+6. Components: PostCard, virtualized PostList (TanStack Virtual), SearchBar (debounced), FilterPanel, TagChips, TagEditor, TagManager, SyncStatus, MediaEmbed, EmptyState, ErrorState, ConfirmDialog, DarkModeToggle, ErrorBoundary
+7. Query hooks: `usePosts`, `useSearchPosts`, `usePost`, `useTags`, `useAuthStatus`, `useSyncStatus`, `useSyncStream` (SSE), `useUnsave`, tag CRUD mutations, `downloadExport`
+8. Seed script (`scripts/seed.ts`): deterministic 200-item fixture (mulberry32 PRNG) exercising image/gallery/video/external/self/comment variants, ~10% orphaned, 6 tag fixtures
+9. Tests: bun test + happy-dom + @testing-library/react for component tests (PostCard, FilterPanel, SearchBar, EmptyState, utils); Playwright smoke suite under `TEST_MODE=1`
 
 ## Verification
 - `bun test packages/core/tests` — passes
 - `bun test packages/cli/tests` — passes
 - `bun run packages/cli/src/index.ts --help` — prints current CLI surface
-- `bun run --filter @reddit-saved/web typecheck` — passes for the current placeholder package
-- `bun run --filter @reddit-saved/web build` — currently fails because the web app scaffold is incomplete (`index.html` missing)
+- `bun run --filter @reddit-saved/web typecheck` — passes
+- `bun run --filter @reddit-saved/web build` — produces a Vite bundle in `packages/web/dist`
+- `bun run --filter @reddit-saved/web test` — bun test + happy-dom component tests pass
+- `bun run --filter @reddit-saved/web seed` — populates `./dev-data/reddit-saved.db` with 200 fixture items
+- `TEST_MODE=1 bun run --filter @reddit-saved/web dev` — runs API (:3001) + Vite (:3000) with Reddit writes/OAuth stubbed
 
 ## Known Limitations & Future Work
 - **Reddit 1000-item API cap**: Reddit's listing endpoints return max 1000 items. Users with >1000 saves will only get the newest 1000 via the API. Orphan detection is disabled when local count >= 1000 to avoid false positives. Future: investigate GDPR data export (used by Reddit-Saved-Post-Extractor) as a bypass for initial import.
@@ -554,7 +629,8 @@ Exit codes: 0=success, 1=error, 2=auth required
 - **No backup**: SQLite DB backup is not implemented. Users can manually copy the DB file. May add `reddit-saved backup` in the future.
 - **CLI arg parsing complexity**: Zero npm deps means hand-rolled arg parser. Nested subcommands (`tag create`, `tag add`) are non-trivial — acknowledge implementation effort in Phase 3.
 - **FTS crash recovery**: If the process crashes between dropping triggers and rebuilding the FTS index, the index may be stale. Mitigated by startup trigger/integrity checks that rebuild only when needed.
-- **Web package is still a scaffold**: `@reddit-saved/web` has dependencies and scripts, but no app shell/API server yet. Build currently fails because Vite has no `index.html`
+- **Web uses EventSource for sync progress**: `EventSource` is GET-only and cannot attach auth headers. The `/api/sync/fetch` SSE endpoint is GET-mounted to keep it usable. An auth token query parameter or switch to `fetch` + a manual SSE parser would be needed for cross-origin deployment; the current app is single-origin (Vite proxy in dev, same origin in prod)
+- **`TEST_MODE` is a dev/test affordance**: Asserts it is not running under `NODE_ENV=production`, but it disables Reddit writes entirely. Do not accidentally ship a `TEST_MODE=1` build
 
 ## Reference Files
 - `/home/auro/code/reddit_saved/reference/saved-reddit-exporter/src/request-queue.ts` — CircuitBreaker (L84-185), RateLimiter (L190-264), OfflineQueue (L269-326), RequestQueue (L331-679)

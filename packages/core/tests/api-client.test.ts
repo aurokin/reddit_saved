@@ -3,7 +3,14 @@ import type { Server } from "bun";
 import { RedditApiClient, type TokenProvider } from "../src/api/client";
 import { MAX_PAGES_SAFETY_LIMIT } from "../src/constants";
 import { RequestQueue } from "../src/queue/request-queue";
-import type { ApiClientCallbacks, AuthSettings, RedditItem, UnsaveResult } from "../src/types";
+import type {
+  ApiClientCallbacks,
+  AuthContext,
+  AuthProvider,
+  AuthSettings,
+  RedditItem,
+  UnsaveResult,
+} from "../src/types";
 
 // ---------------------------------------------------------------------------
 // Mock token provider
@@ -23,6 +30,25 @@ function createMockTokenProvider(overrides?: Partial<AuthSettings>): TokenProvid
     async ensureValidToken() {},
     getSettings() {
       return settings;
+    },
+  };
+}
+
+function createMockAuthProvider(overrides: Partial<AuthContext> = {}): AuthProvider {
+  const auth: AuthContext = {
+    headers: { Cookie: "reddit_session=abc", "User-Agent": "Mozilla/5.0" },
+    baseUrl,
+    pathSuffix: ".json",
+    username: "cookieuser",
+    ...overrides,
+  };
+  return {
+    async ensureValid() {},
+    getAuthContext() {
+      return auth;
+    },
+    isAuthenticated() {
+      return true;
     },
   };
 }
@@ -65,6 +91,9 @@ beforeAll(() => {
       // GET /api/v1/me
       if (path === "/api/v1/me") {
         const auth = req.headers.get("Authorization") ?? "";
+        if (!auth) {
+          return new Response("Unauthorized", { status: 401, headers: rateHeaders });
+        }
         if (auth === "Bearer error-token") {
           return Response.json({ error: "forbidden" }, { headers: rateHeaders });
         }
@@ -75,6 +104,17 @@ beforeAll(() => {
           return new Response(null, { status: 204, headers: rateHeaders });
         }
         return Response.json({ name: "testuser" }, { headers: rateHeaders });
+      }
+
+      if (path === "/api/me.json") {
+        const cookie = req.headers.get("Cookie") ?? "";
+        if (!cookie.includes("reddit_session=")) {
+          return new Response("Unauthorized", { status: 401, headers: rateHeaders });
+        }
+        return Response.json(
+          { kind: "t2", data: { name: "cookieuser", modhash: "deadbeef" } },
+          { headers: rateHeaders },
+        );
       }
 
       // User content endpoints (saved, upvoted, submitted, comments)
@@ -463,12 +503,13 @@ afterAll(() => {
 
 function createClient(opts?: {
   callbacks?: ApiClientCallbacks;
+  provider?: TokenProvider | AuthProvider;
   tokenProvider?: TokenProvider;
   maxRetries?: number;
 }): RedditApiClient {
-  const tp = opts?.tokenProvider ?? createMockTokenProvider();
+  const provider = opts?.provider ?? opts?.tokenProvider ?? createMockTokenProvider();
   const queue = new RequestQueue({ maxRetries: opts?.maxRetries ?? 0 });
-  return new RedditApiClient(tp, queue, opts?.callbacks, baseUrl);
+  return new RedditApiClient(provider, queue, opts?.callbacks, baseUrl);
 }
 
 // ---------------------------------------------------------------------------
@@ -532,6 +573,14 @@ describe("RedditApiClient", () => {
       const client = createClient();
       const username = await client.fetchUsername();
       expect(username).toBe("testuser");
+    });
+
+    test("returns username from /api/me.json in cookie mode", async () => {
+      const client = createClient({
+        provider: createMockAuthProvider(),
+      });
+      const username = await client.fetchUsername();
+      expect(username).toBe("cookieuser");
     });
 
     test("throws when API returns error", async () => {

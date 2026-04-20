@@ -1,4 +1,3 @@
-import { dirname, join } from "node:path";
 import {
   type CheckpointData,
   type ContentOrigin,
@@ -7,6 +6,7 @@ import {
   SyncStateManager,
   detectOrphans,
   formatDuration,
+  getCheckpointPathForDatabase,
 } from "@reddit-saved/core";
 
 const ORIGIN_MAP: Record<string, ContentOrigin> = {
@@ -74,9 +74,7 @@ export async function fetchCmd(
 
   try {
     // Co-locate checkpoint with the database when --db is used
-    const checkpointPath = dbPath
-      ? join(dirname(dbPath), ".reddit-import-checkpoint.json")
-      : undefined;
+    const checkpointPath = dbPath ? getCheckpointPathForDatabase(dbPath) : undefined;
     const stateManager = new SyncStateManager(checkpointPath);
     const loadedCheckpoint = await stateManager.load();
 

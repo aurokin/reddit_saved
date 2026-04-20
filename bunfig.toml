@@ -1,3 +1,4 @@
 [test]
 coverage = false
+preload = ["./packages/web/tests/setup.ts"]
 root = "packages/"

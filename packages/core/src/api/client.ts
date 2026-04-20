@@ -9,6 +9,8 @@ import {
 import type { RequestQueue, RequestQueueStatus } from "../queue/request-queue";
 import type {
   ApiClientCallbacks,
+  AuthContext,
+  AuthProvider,
   AuthSettings,
   CommentSortOrder,
   CommentThread,
@@ -32,33 +34,83 @@ import {
   buildUserAgent,
 } from "./endpoints";
 
-/** Minimal interface for token management — enables lightweight test mocks */
+/** Legacy OAuth-only provider shape — kept for backward compatibility. New code
+ *  should implement AuthProvider directly. The client adapts TokenProvider into
+ *  an AuthContext using the bot User-Agent + Bearer token + REDDIT_OAUTH_BASE_URL. */
 export interface TokenProvider {
   ensureValidToken(): Promise<void>;
   getSettings(): AuthSettings;
+}
+
+function isAuthProvider(p: TokenProvider | AuthProvider): p is AuthProvider {
+  return typeof (p as AuthProvider).getAuthContext === "function";
 }
 
 /**
  * Reddit API client that delegates all HTTP to RequestQueue.
  * Handles pagination, content origin tagging, comment parsing,
  * and unsave operations.
+ *
+ * Accepts either an AuthProvider (preferred — supports OAuth or session/cookie
+ * auth) or the legacy TokenProvider (OAuth only, baseUrl override supported via
+ * constructor arg). Endpoints are auth-mode-agnostic via AuthContext.
  */
 export class RedditApiClient {
-  private tokenProvider: TokenProvider;
+  private provider: TokenProvider | AuthProvider;
   private requestQueue: RequestQueue;
   private callbacks: ApiClientCallbacks;
-  private baseUrl: string;
+  private baseUrlOverride: string | null;
 
   constructor(
-    tokenProvider: TokenProvider,
+    provider: TokenProvider | AuthProvider,
     requestQueue: RequestQueue,
     callbacks?: ApiClientCallbacks,
     baseUrl?: string,
   ) {
-    this.tokenProvider = tokenProvider;
+    this.provider = provider;
     this.requestQueue = requestQueue;
     this.callbacks = callbacks ?? {};
-    this.baseUrl = baseUrl ?? REDDIT_OAUTH_BASE_URL;
+    this.baseUrlOverride = baseUrl ?? null;
+  }
+
+  /** Resolve an AuthContext from either provider type. baseUrl override (legacy
+   *  4th constructor arg) wins over what the provider returns — used by tests
+   *  pointing at a mock Reddit server. */
+  private resolveAuth(): AuthContext {
+    if (isAuthProvider(this.provider)) {
+      const ctx = this.provider.getAuthContext();
+      return this.baseUrlOverride ? { ...ctx, baseUrl: this.baseUrlOverride } : ctx;
+    }
+    const s = this.provider.getSettings();
+    return {
+      headers: {
+        Authorization: `Bearer ${s.accessToken}`,
+        "User-Agent": buildUserAgent(s.username),
+      },
+      baseUrl: this.baseUrlOverride ?? REDDIT_OAUTH_BASE_URL,
+      pathSuffix: "",
+      username: s.username,
+    };
+  }
+
+  private async ensureValid(): Promise<void> {
+    if (isAuthProvider(this.provider)) {
+      await this.provider.ensureValid();
+    } else {
+      await this.provider.ensureValidToken();
+    }
+  }
+
+  /** Replace the event callbacks. Useful for routing events through different
+   *  consumers (e.g. CLI stderr vs. SSE streams) without constructing a new client. */
+  setCallbacks(callbacks: ApiClientCallbacks): void {
+    this.callbacks = callbacks ?? {};
+  }
+
+  /** Read-only view of the current callbacks — callers typically use this to
+   *  restore the previous handler after a scoped override (e.g. one sync request). */
+  getCallbacks(): ApiClientCallbacks {
+    return this.callbacks;
   }
 
   // --------------------------------------------------------------------------
@@ -86,24 +138,28 @@ export class RedditApiClient {
   // --------------------------------------------------------------------------
 
   async fetchUsername(signal?: AbortSignal): Promise<string> {
-    await this.tokenProvider.ensureValidToken();
-    const { accessToken } = this.tokenProvider.getSettings();
-    const ua = this.getUserAgent();
+    await this.ensureValid();
+    const auth = this.resolveAuth();
 
-    const params = buildMeRequest(accessToken, ua, this.baseUrl);
+    const params = buildMeRequest(auth);
     if (signal) params.signal = signal;
     const response = await this.requestQueue.enqueue(params);
 
-    const body = response.body as { name?: string; error?: string } | null;
-    if (!body || body.error) {
-      throw new Error(`Failed to fetch username: ${body?.error ?? "empty response"}`);
+    // Cookie-mode (/api/v1/me.json) wraps the user in { kind: "t2", data: { name } }.
+    // OAuth (/api/v1/me) returns { name } at top level.
+    const raw = response.body as
+      | { name?: string; error?: string; data?: { name?: string } }
+      | null;
+    if (!raw || raw.error) {
+      throw new Error(`Failed to fetch username: ${raw?.error ?? "empty response"}`);
     }
-    if (!body.name) {
+    const name = raw.name ?? raw.data?.name;
+    if (!name) {
       throw new Error(
         "Reddit API did not return a username. Response contained unexpected fields.",
       );
     }
-    return body.name;
+    return name;
   }
 
   // --------------------------------------------------------------------------
@@ -111,11 +167,10 @@ export class RedditApiClient {
   // --------------------------------------------------------------------------
 
   async unsaveItem(fullname: string, signal?: AbortSignal): Promise<void> {
-    await this.tokenProvider.ensureValidToken();
-    const { accessToken } = this.tokenProvider.getSettings();
-    const ua = this.getUserAgent();
+    await this.ensureValid();
+    const auth = this.resolveAuth();
 
-    const params = buildUnsaveRequest(accessToken, fullname, ua, this.baseUrl);
+    const params = buildUnsaveRequest(auth, fullname);
     if (signal) params.signal = signal;
     await this.requestQueue.enqueue(params);
   }
@@ -155,19 +210,10 @@ export class RedditApiClient {
     sort?: CommentSortOrder,
     signal?: AbortSignal,
   ): Promise<RedditComment[]> {
-    await this.tokenProvider.ensureValidToken();
-    const { accessToken } = this.tokenProvider.getSettings();
-    const ua = this.getUserAgent();
+    await this.ensureValid();
+    const auth = this.resolveAuth();
 
-    const params = buildCommentsRequest(
-      accessToken,
-      permalink,
-      ua,
-      undefined,
-      undefined,
-      sort,
-      this.baseUrl,
-    );
+    const params = buildCommentsRequest(auth, permalink, undefined, undefined, sort);
     if (signal) params.signal = signal;
     const response = await this.requestQueue.enqueue(params);
 
@@ -186,17 +232,10 @@ export class RedditApiClient {
     contextDepth = 3,
     signal?: AbortSignal,
   ): Promise<RedditItemData | null> {
-    await this.tokenProvider.ensureValidToken();
-    const { accessToken } = this.tokenProvider.getSettings();
-    const ua = this.getUserAgent();
+    await this.ensureValid();
+    const auth = this.resolveAuth();
 
-    const params = buildCommentContextRequest(
-      accessToken,
-      commentPermalink,
-      ua,
-      contextDepth,
-      this.baseUrl,
-    );
+    const params = buildCommentContextRequest(auth, commentPermalink, contextDepth);
     if (signal) params.signal = signal;
     const response = await this.requestQueue.enqueue(params);
 
@@ -254,19 +293,10 @@ export class RedditApiClient {
     maxDepth: number = COMMENT_MAX_DEPTH,
     signal?: AbortSignal,
   ): Promise<RedditItemData[]> {
-    await this.tokenProvider.ensureValidToken();
-    const { accessToken } = this.tokenProvider.getSettings();
-    const ua = this.getUserAgent();
+    await this.ensureValid();
+    const auth = this.resolveAuth();
 
-    const params = buildCommentsRequest(
-      accessToken,
-      commentPermalink,
-      ua,
-      100,
-      maxDepth,
-      undefined,
-      this.baseUrl,
-    );
+    const params = buildCommentsRequest(auth, commentPermalink, 100, maxDepth);
     if (signal) params.signal = signal;
     const response = await this.requestQueue.enqueue(params);
 
@@ -298,18 +328,10 @@ export class RedditApiClient {
     sort?: string,
     signal?: AbortSignal,
   ): Promise<CommentThread | null> {
-    await this.tokenProvider.ensureValidToken();
-    const { accessToken } = this.tokenProvider.getSettings();
-    const ua = this.getUserAgent();
+    await this.ensureValid();
+    const auth = this.resolveAuth();
 
-    const params = buildCommentThreadRequest(
-      accessToken,
-      postId,
-      subreddit,
-      ua,
-      sort,
-      this.baseUrl,
-    );
+    const params = buildCommentThreadRequest(auth, postId, subreddit, sort);
     if (signal) params.signal = signal;
     const response = await this.requestQueue.enqueue(params);
 
@@ -402,19 +424,10 @@ export class RedditApiClient {
 
       let response: RequestResponse;
       try {
-        await this.tokenProvider.ensureValidToken();
-        const { accessToken, username } = this.tokenProvider.getSettings();
-        const ua = this.getUserAgent();
+        await this.ensureValid();
+        const auth = this.resolveAuth();
 
-        const params = buildContentPageRequest(
-          accessToken,
-          username,
-          endpoint,
-          pageSize,
-          ua,
-          after,
-          this.baseUrl,
-        );
+        const params = buildContentPageRequest(auth, endpoint, pageSize, after);
         if (options.signal) {
           params.signal = options.signal;
         }
@@ -557,14 +570,5 @@ export class RedditApiClient {
     }
 
     return result;
-  }
-
-  // --------------------------------------------------------------------------
-  // Internal helpers
-  // --------------------------------------------------------------------------
-
-  private getUserAgent(): string {
-    const { username } = this.tokenProvider.getSettings();
-    return buildUserAgent(username);
   }
 }

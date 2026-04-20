@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(0 0% 7%);
+  --color-muted: hsl(0 0% 96%);
+  --color-muted-foreground: hsl(0 0% 45%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(0 0% 7%);
+  --color-border: hsl(0 0% 89%);
+  --color-input: hsl(0 0% 89%);
+  --color-ring: hsl(0 0% 63%);
+  --color-primary: hsl(22 92% 52%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-secondary: hsl(0 0% 96%);
+  --color-secondary-foreground: hsl(0 0% 9%);
+  --color-accent: hsl(0 0% 96%);
+  --color-accent-foreground: hsl(0 0% 9%);
+  --color-destructive: hsl(0 72% 51%);
+  --color-destructive-foreground: hsl(0 0% 98%);
+  --color-sidebar: hsl(0 0% 98%);
+  --radius: 0.5rem;
+}
+
+.dark {
+  --color-background: hsl(0 0% 7%);
+  --color-foreground: hsl(0 0% 95%);
+  --color-muted: hsl(0 0% 14%);
+  --color-muted-foreground: hsl(0 0% 63%);
+  --color-card: hsl(0 0% 10%);
+  --color-card-foreground: hsl(0 0% 95%);
+  --color-border: hsl(0 0% 18%);
+  --color-input: hsl(0 0% 18%);
+  --color-ring: hsl(0 0% 40%);
+  --color-primary: hsl(22 92% 56%);
+  --color-primary-foreground: hsl(0 0% 7%);
+  --color-secondary: hsl(0 0% 14%);
+  --color-secondary-foreground: hsl(0 0% 95%);
+  --color-accent: hsl(0 0% 16%);
+  --color-accent-foreground: hsl(0 0% 95%);
+  --color-destructive: hsl(0 72% 51%);
+  --color-destructive-foreground: hsl(0 0% 95%);
+  --color-sidebar: hsl(0 0% 10%);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family:
+      ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+      "Noto Sans", sans-serif;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+  /* Highlight FTS snippet markers */
+  .fts-snippet b {
+    background-color: color-mix(in oklch, var(--color-primary) 25%, transparent);
+    color: var(--color-foreground);
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  /* Reddit body_html resets */
+  .reddit-body a {
+    color: var(--color-primary);
+    text-decoration: underline;
+  }
+  .reddit-body pre {
+    background: var(--color-muted);
+    padding: 0.75rem;
+    border-radius: var(--radius);
+    overflow-x: auto;
+  }
+  .reddit-body blockquote {
+    border-left: 3px solid var(--color-border);
+    padding-left: 1rem;
+    color: var(--color-muted-foreground);
+  }
+  .reddit-body ul,
+  .reddit-body ol {
+    padding-left: 1.5rem;
+  }
+  .reddit-body ul {
+    list-style: disc;
+  }
+  .reddit-body ol {
+    list-style: decimal;
+  }
+}

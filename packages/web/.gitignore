@@ -1,0 +1,5 @@
+dev-data/
+dist/
+playwright-report/
+test-results/
+.playwright-auth/

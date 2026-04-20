@@ -333,6 +333,54 @@ export interface AuthSettings {
   clientSecret: string;
 }
 
+/** Cookie payload posted by the companion browser extension. */
+export interface SessionPayload {
+  cookies: Array<{
+    name: string;
+    value: string;
+    domain: string;
+    path: string;
+    expirationDate: number | null;
+  }>;
+  cookieHeader: string;
+  userAgent: string;
+  modhash?: string;
+  username?: string;
+  capturedAt?: number;
+}
+
+/** Persisted session state on disk (session.json). */
+export interface SessionSettings {
+  cookieHeader: string;
+  userAgent: string;
+  modhash: string;
+  username: string;
+  capturedAt: number;
+}
+
+export interface SessionBlockSettings {
+  blockedAt: number;
+  reason: "user-disconnected";
+}
+
+/** Everything an endpoint builder needs to construct a request — auth headers,
+ *  the API base URL, the path suffix Reddit requires (".json" for cookie auth on
+ *  www.reddit.com, "" for OAuth on oauth.reddit.com), and the username so /user/
+ *  routes can be templated. The AuthProvider produces this; endpoint builders are
+ *  agnostic to the underlying auth mode. */
+export interface AuthContext {
+  headers: Record<string, string>;
+  baseUrl: string;
+  pathSuffix: string;
+  username: string;
+}
+
+export interface AuthProvider {
+  ensureValid(): Promise<void>;
+  getAuthContext(): AuthContext;
+  isAuthenticated(): boolean;
+}
+
 // ============================================================================
 // Performance Monitor Types
 // ============================================================================
@@ -463,6 +511,7 @@ export interface SearchOptions {
   /** true = orphaned only, false/undefined = active only, "all" = both */
   orphaned?: boolean | "all";
   kind?: "t1" | "t3";
+  contentOrigin?: ContentOrigin;
   /** Unix timestamp in seconds; include rows created at or after this time */
   createdAfter?: number;
   /** Unix timestamp in seconds; include rows created at or before this time */
@@ -518,7 +567,9 @@ export interface StorageAdapter {
   upsertPosts(items: RedditItem[], origin: ContentOrigin): void;
   getPost(id: string): PostRow | null;
   listPosts(opts: ListOptions): PostRow[];
+  countPosts(opts: ListOptions): number;
   searchPosts(query: string, opts: SearchOptions): SearchResult[];
+  countSearchPosts(query: string, opts: SearchOptions): number;
   /** Mark items as orphaned if their last_seen_at is before olderThan.
    *  @param olderThan — epoch milliseconds (Date.now()), NOT Unix seconds */
   markOrphaned(olderThan: number, origin?: ContentOrigin): number;

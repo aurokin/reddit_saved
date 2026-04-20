@@ -1,6 +1,10 @@
 import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import {
+  SEARCH_SNIPPET_HIGHLIGHT_END,
+  SEARCH_SNIPPET_HIGHLIGHT_START,
+} from "../constants";
 import type {
   ContentOrigin,
   DbStats,
@@ -28,6 +32,103 @@ type BindRecord = Record<string, BindValue>;
  *  Uses EXISTS with explicit post_id reference to avoid coupling to the outer query alias. */
 const TAG_FILTER_SQL =
   "EXISTS (SELECT 1 FROM post_tags pt2 JOIN tags t2 ON t2.id = pt2.tag_id WHERE pt2.post_id = p.id AND t2.name = ?)";
+
+function buildListFilterParts(opts: ListOptions): { where: string[]; params: BindValue[] } {
+  const where: string[] = [];
+  const params: BindValue[] = [];
+
+  if (opts.orphaned === true) {
+    where.push("p.is_on_reddit = 0");
+  } else if (opts.orphaned !== "all") {
+    where.push("p.is_on_reddit = 1");
+  }
+
+  if (opts.subreddit) {
+    where.push("p.subreddit = ?");
+    params.push(opts.subreddit);
+  }
+  if (opts.author) {
+    where.push("p.author = ?");
+    params.push(opts.author);
+  }
+  if (opts.minScore !== undefined) {
+    where.push("p.score >= ?");
+    params.push(opts.minScore);
+  }
+  if (opts.kind) {
+    where.push("p.kind = ?");
+    params.push(opts.kind);
+  }
+  if (opts.contentOrigin) {
+    where.push("p.content_origin = ?");
+    params.push(opts.contentOrigin);
+  }
+  if (opts.tag) {
+    where.push(TAG_FILTER_SQL);
+    params.push(opts.tag);
+  }
+
+  return { where, params };
+}
+
+function buildSearchFilterParts(
+  query: string,
+  opts: SearchOptions,
+): { where: string[]; params: BindValue[] } {
+  if (!query.trim()) return { where: [], params: [] };
+
+  // Sanitize for FTS5: keep only letters, digits, and whitespace, then wrap
+  // as a double-quoted phrase literal. This prevents any FTS5 operator or
+  // structural character (", *, ^, parentheses, OR/AND/NOT, etc.) from leaking.
+  const cleaned = query
+    .replace(/[^\p{L}\p{N}\s\-']/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return { where: [], params: [] };
+
+  const where: string[] = ["posts_fts MATCH ?"];
+  const params: BindValue[] = [`"${cleaned}"`];
+
+  if (opts.orphaned === true) {
+    where.push("p.is_on_reddit = 0");
+  } else if (opts.orphaned !== "all") {
+    where.push("p.is_on_reddit = 1");
+  }
+  if (opts.subreddit) {
+    where.push("p.subreddit = ?");
+    params.push(opts.subreddit);
+  }
+  if (opts.author) {
+    where.push("p.author = ?");
+    params.push(opts.author);
+  }
+  if (opts.minScore !== undefined) {
+    where.push("p.score >= ?");
+    params.push(opts.minScore);
+  }
+  if (opts.kind) {
+    where.push("p.kind = ?");
+    params.push(opts.kind);
+  }
+  if (opts.contentOrigin) {
+    where.push("p.content_origin = ?");
+    params.push(opts.contentOrigin);
+  }
+  if (opts.createdAfter !== undefined) {
+    where.push("p.created_utc >= ?");
+    params.push(opts.createdAfter);
+  }
+  if (opts.createdBefore !== undefined) {
+    where.push("p.created_utc <= ?");
+    params.push(opts.createdBefore);
+  }
+  if (opts.tag) {
+    where.push(TAG_FILTER_SQL);
+    params.push(opts.tag);
+  }
+
+  return { where, params };
+}
 
 export class SqliteAdapter implements StorageAdapter {
   private db: Database;
@@ -131,40 +232,7 @@ export class SqliteAdapter implements StorageAdapter {
   }
 
   listPosts(opts: ListOptions): PostRow[] {
-    const where: string[] = [];
-    const params: BindValue[] = [];
-
-    if (opts.orphaned === true) {
-      where.push("p.is_on_reddit = 0");
-    } else if (opts.orphaned !== "all") {
-      where.push("p.is_on_reddit = 1");
-    }
-
-    if (opts.subreddit) {
-      where.push("p.subreddit = ?");
-      params.push(opts.subreddit);
-    }
-    if (opts.author) {
-      where.push("p.author = ?");
-      params.push(opts.author);
-    }
-    if (opts.minScore !== undefined) {
-      where.push("p.score >= ?");
-      params.push(opts.minScore);
-    }
-    if (opts.kind) {
-      where.push("p.kind = ?");
-      params.push(opts.kind);
-    }
-    if (opts.contentOrigin) {
-      where.push("p.content_origin = ?");
-      params.push(opts.contentOrigin);
-    }
-
-    if (opts.tag) {
-      where.push(TAG_FILTER_SQL);
-      params.push(opts.tag);
-    }
+    const { where, params } = buildListFilterParts(opts);
 
     const sortCol = opts.sort === "score" ? "p.score" : "p.created_utc";
     const sortDir = opts.sortDirection === "asc" ? "ASC" : "DESC";
@@ -184,56 +252,20 @@ export class SqliteAdapter implements StorageAdapter {
     return this.db.query(sql).all(...(params as SQLQueryBindings[])) as PostRow[];
   }
 
+  countPosts(opts: ListOptions): number {
+    const { where, params } = buildListFilterParts(opts);
+    const sql = `
+      SELECT COUNT(*) AS total
+      FROM posts p
+      ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
+    `;
+    const row = this.db.query(sql).get(...(params as SQLQueryBindings[])) as { total: number };
+    return row.total;
+  }
+
   searchPosts(query: string, opts: SearchOptions): SearchResult[] {
-    if (!query.trim()) return [];
-
-    // Sanitize for FTS5: keep only letters, digits, and whitespace, then wrap
-    // as a double-quoted phrase literal. This prevents any FTS5 operator or
-    // structural character (", *, ^, parentheses, OR/AND/NOT, etc.) from leaking.
-    const cleaned = query
-      .replace(/[^\p{L}\p{N}\s\-']/gu, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (!cleaned) return [];
-    const safeQuery = `"${cleaned}"`;
-
-    const where: string[] = ["posts_fts MATCH ?"];
-    const params: BindValue[] = [safeQuery];
-
-    if (opts.orphaned === true) {
-      where.push("p.is_on_reddit = 0");
-    } else if (opts.orphaned !== "all") {
-      where.push("p.is_on_reddit = 1");
-    }
-    if (opts.subreddit) {
-      where.push("p.subreddit = ?");
-      params.push(opts.subreddit);
-    }
-    if (opts.author) {
-      where.push("p.author = ?");
-      params.push(opts.author);
-    }
-    if (opts.minScore !== undefined) {
-      where.push("p.score >= ?");
-      params.push(opts.minScore);
-    }
-    if (opts.kind) {
-      where.push("p.kind = ?");
-      params.push(opts.kind);
-    }
-    if (opts.createdAfter !== undefined) {
-      where.push("p.created_utc >= ?");
-      params.push(opts.createdAfter);
-    }
-    if (opts.createdBefore !== undefined) {
-      where.push("p.created_utc <= ?");
-      params.push(opts.createdBefore);
-    }
-
-    if (opts.tag) {
-      where.push(TAG_FILTER_SQL);
-      params.push(opts.tag);
-    }
+    const { where, params } = buildSearchFilterParts(query, opts);
+    if (where.length === 0) return [];
 
     params.push(Math.min(opts.limit ?? 50, 10_000), opts.offset ?? 0);
 
@@ -243,9 +275,9 @@ export class SqliteAdapter implements StorageAdapter {
       SELECT p.*,
         (SELECT GROUP_CONCAT(t.name, '||') FROM post_tags pt JOIN tags t ON t.id = pt.tag_id WHERE pt.post_id = p.id) AS tags,
         coalesce(
-          snippet(posts_fts, 0, '<b>', '</b>', '...', 32),
-          snippet(posts_fts, 2, '<b>', '</b>', '...', 32),
-          snippet(posts_fts, 1, '<b>', '</b>', '...', 32)
+          snippet(posts_fts, 0, '${SEARCH_SNIPPET_HIGHLIGHT_START}', '${SEARCH_SNIPPET_HIGHLIGHT_END}', '...', 32),
+          snippet(posts_fts, 2, '${SEARCH_SNIPPET_HIGHLIGHT_START}', '${SEARCH_SNIPPET_HIGHLIGHT_END}', '...', 32),
+          snippet(posts_fts, 1, '${SEARCH_SNIPPET_HIGHLIGHT_START}', '${SEARCH_SNIPPET_HIGHLIGHT_END}', '...', 32)
         ) AS snippet,
         bm25(posts_fts) AS rank
       FROM posts_fts
@@ -264,6 +296,29 @@ export class SqliteAdapter implements StorageAdapter {
       const msg = err instanceof Error ? err.message : String(err);
       if (/fts5: syntax error|malformed MATCH expression/i.test(msg)) {
         return [];
+      }
+      throw err;
+    }
+  }
+
+  countSearchPosts(query: string, opts: SearchOptions): number {
+    const { where, params } = buildSearchFilterParts(query, opts);
+    if (where.length === 0) return 0;
+
+    const sql = `
+      SELECT COUNT(*) AS total
+      FROM posts_fts
+      JOIN posts p ON posts_fts.rowid = p.rowid
+      WHERE ${where.join(" AND ")}
+    `;
+
+    try {
+      const row = this.db.query(sql).get(...(params as SQLQueryBindings[])) as { total: number };
+      return row.total;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/fts5: syntax error|malformed MATCH expression/i.test(msg)) {
+        return 0;
       }
       throw err;
     }

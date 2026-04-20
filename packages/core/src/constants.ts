@@ -115,6 +115,10 @@ export const CONTENT_ORIGINS: readonly ContentOrigin[] = [
   CONTENT_ORIGIN_COMMENTED,
 ];
 
+/** Search snippet highlight markers emitted by SQLite FTS and restored at render time. */
+export const SEARCH_SNIPPET_HIGHLIGHT_START = "[[RS_HL_START]]";
+export const SEARCH_SNIPPET_HIGHLIGHT_END = "[[RS_HL_END]]";
+
 // ============================================================================
 // Comment Configuration
 // ============================================================================

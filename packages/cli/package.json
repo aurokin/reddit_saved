@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "bun run src/index.ts",
-    "build": "bun build ./src/index.ts --compile --outfile reddit-saved",
+    "build": "bun build ./src/index.ts --compile --outfile dist/reddit-saved",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit"
   },

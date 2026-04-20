@@ -2,14 +2,11 @@ import {
   COMMENT_MAX_DEPTH,
   COMMENT_MAX_TOP_LEVEL,
   CONTENT_TYPE_FORM_URLENCODED,
-  HEADER_AUTHORIZATION,
   HEADER_CONTENT_TYPE,
-  HEADER_USER_AGENT,
-  REDDIT_OAUTH_BASE_URL,
   USER_AGENT_TEMPLATE,
   VERSION,
 } from "../constants";
-import type { CommentSortOrder, RequestParams } from "../types";
+import type { AuthContext, CommentSortOrder, RequestParams } from "../types";
 
 /** Validate that a permalink is safe to interpolate into a URL path */
 function validatePermalink(permalink: string): void {
@@ -36,123 +33,91 @@ export function buildUserAgent(username: string): string {
 
 /** Build RequestParams for a user content page fetch (saved, upvoted, submitted, comments) */
 export function buildContentPageRequest(
-  accessToken: string,
-  username: string,
+  auth: AuthContext,
   endpoint: string,
   pageSize: number,
-  userAgent: string,
   after?: string | null,
-  baseUrl: string = REDDIT_OAUTH_BASE_URL,
 ): RequestParams {
   const clampedPageSize = Math.max(1, Math.min(100, pageSize));
-  let url = `${baseUrl}/user/${encodeURIComponent(username)}/${encodeURIComponent(endpoint)}?limit=${clampedPageSize}`;
+  let url = `${auth.baseUrl}/user/${encodeURIComponent(auth.username)}/${encodeURIComponent(endpoint)}${auth.pathSuffix}?limit=${clampedPageSize}`;
   if (after) url += `&after=${encodeURIComponent(after)}`;
 
   return {
     url,
     method: "GET",
-    headers: {
-      [HEADER_AUTHORIZATION]: `Bearer ${accessToken}`,
-      [HEADER_USER_AGENT]: userAgent,
-    },
+    headers: { ...auth.headers },
   };
 }
 
 /** Build RequestParams for POST /api/unsave */
-export function buildUnsaveRequest(
-  accessToken: string,
-  fullname: string,
-  userAgent: string,
-  baseUrl: string = REDDIT_OAUTH_BASE_URL,
-): RequestParams {
+export function buildUnsaveRequest(auth: AuthContext, fullname: string): RequestParams {
   return {
-    url: `${baseUrl}/api/unsave`,
+    url: `${auth.baseUrl}/api/unsave`,
     method: "POST",
     headers: {
-      [HEADER_AUTHORIZATION]: `Bearer ${accessToken}`,
+      ...auth.headers,
       [HEADER_CONTENT_TYPE]: CONTENT_TYPE_FORM_URLENCODED,
-      [HEADER_USER_AGENT]: userAgent,
     },
     body: `id=${encodeURIComponent(fullname)}`,
   };
 }
 
-/** Build RequestParams for GET /api/v1/me */
-export function buildMeRequest(
-  accessToken: string,
-  userAgent: string,
-  baseUrl: string = REDDIT_OAUTH_BASE_URL,
-): RequestParams {
+/** Build RequestParams for GET /api/v1/me or /api/me.json */
+export function buildMeRequest(auth: AuthContext): RequestParams {
+  const url =
+    auth.pathSuffix === ".json" ? `${auth.baseUrl}/api/me.json` : `${auth.baseUrl}/api/v1/me`;
   return {
-    url: `${baseUrl}/api/v1/me`,
+    url,
     method: "GET",
-    headers: {
-      [HEADER_AUTHORIZATION]: `Bearer ${accessToken}`,
-      [HEADER_USER_AGENT]: userAgent,
-    },
+    headers: { ...auth.headers },
   };
 }
 
 /** Build RequestParams for fetching post comments */
 export function buildCommentsRequest(
-  accessToken: string,
+  auth: AuthContext,
   permalink: string,
-  userAgent: string,
   limit: number = COMMENT_MAX_TOP_LEVEL,
   depth: number = COMMENT_MAX_DEPTH,
   sort: CommentSortOrder = "top",
-  baseUrl: string = REDDIT_OAUTH_BASE_URL,
 ): RequestParams {
   validatePermalink(permalink);
   const cleanPermalink = permalink.replace(/\/+$/, "");
   const clampedLimit = Math.max(1, Math.min(100, limit));
   const clampedDepth = Math.max(1, Math.min(10, depth));
   return {
-    url: `${baseUrl}${cleanPermalink}.json?limit=${clampedLimit}&depth=${clampedDepth}&sort=${encodeURIComponent(sort)}`,
+    url: `${auth.baseUrl}${cleanPermalink}.json?limit=${clampedLimit}&depth=${clampedDepth}&sort=${encodeURIComponent(sort)}`,
     method: "GET",
-    headers: {
-      [HEADER_AUTHORIZATION]: `Bearer ${accessToken}`,
-      [HEADER_USER_AGENT]: userAgent,
-    },
+    headers: { ...auth.headers },
   };
 }
 
 /** Build RequestParams for fetching a comment with parent context */
 export function buildCommentContextRequest(
-  accessToken: string,
+  auth: AuthContext,
   commentPermalink: string,
-  userAgent: string,
   contextDepth = 3,
-  baseUrl: string = REDDIT_OAUTH_BASE_URL,
 ): RequestParams {
   validatePermalink(commentPermalink);
   const cleanPermalink = commentPermalink.replace(/\/+$/, "");
   const depth = Math.max(1, Math.min(10, contextDepth));
   return {
-    url: `${baseUrl}${cleanPermalink}.json?context=${depth}`,
+    url: `${auth.baseUrl}${cleanPermalink}.json?context=${depth}`,
     method: "GET",
-    headers: {
-      [HEADER_AUTHORIZATION]: `Bearer ${accessToken}`,
-      [HEADER_USER_AGENT]: userAgent,
-    },
+    headers: { ...auth.headers },
   };
 }
 
 /** Build RequestParams for fetching a full comment thread */
 export function buildCommentThreadRequest(
-  accessToken: string,
+  auth: AuthContext,
   postId: string,
   subreddit: string,
-  userAgent: string,
   sort = "best",
-  baseUrl: string = REDDIT_OAUTH_BASE_URL,
 ): RequestParams {
   return {
-    url: `${baseUrl}/r/${encodeURIComponent(subreddit)}/comments/${encodeURIComponent(postId)}.json?sort=${encodeURIComponent(sort)}&limit=${COMMENT_MAX_TOP_LEVEL}&depth=${COMMENT_MAX_DEPTH}`,
+    url: `${auth.baseUrl}/r/${encodeURIComponent(subreddit)}/comments/${encodeURIComponent(postId)}.json?sort=${encodeURIComponent(sort)}&limit=${COMMENT_MAX_TOP_LEVEL}&depth=${COMMENT_MAX_DEPTH}`,
     method: "GET",
-    headers: {
-      [HEADER_AUTHORIZATION]: `Bearer ${accessToken}`,
-      [HEADER_USER_AGENT]: userAgent,
-    },
+    headers: { ...auth.headers },
   };
 }

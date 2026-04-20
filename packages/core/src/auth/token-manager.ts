@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { buildUserAgent } from "../api/endpoints";
 import {
   AUTH_FETCH_TIMEOUT_MS,
   CONTENT_TYPE_FORM_URLENCODED,
@@ -11,7 +12,7 @@ import {
   USER_AGENT_TEMPLATE,
   VERSION,
 } from "../constants";
-import type { AuthSettings } from "../types";
+import type { AuthContext, AuthProvider, AuthSettings } from "../types";
 import { paths } from "../utils/paths";
 
 /**
@@ -19,7 +20,7 @@ import { paths } from "../utils/paths";
  * Uses file-based locking to prevent concurrent token refresh races
  * between CLI and web processes sharing the same auth.json.
  */
-export class TokenManager {
+export class TokenManager implements AuthProvider {
   private settings: AuthSettings | null = null;
 
   /** Load auth settings from disk, or return null if not authenticated */
@@ -298,9 +299,42 @@ export class TokenManager {
     return this.settings;
   }
 
+  /** Best-effort snapshot of the persisted OAuth username without forcing token refresh. */
+  async getPersistedUsername(): Promise<string | null> {
+    if (!this.settings) {
+      const loaded = await this.load({ requireClientSecret: false });
+      if (!loaded) return null;
+    }
+    return this.settings?.username || null;
+  }
+
   /** Check if credentials are present (does not verify token validity) */
   isAuthenticated(): boolean {
     return !!(this.settings?.accessToken && this.settings?.refreshToken);
+  }
+
+  // --------------------------------------------------------------------------
+  // AuthProvider conformance — adapts OAuth state into the AuthContext shape
+  // that endpoint builders expect.
+  // --------------------------------------------------------------------------
+
+  async ensureValid(): Promise<void> {
+    return this.ensureValidToken();
+  }
+
+  getAuthContext(): AuthContext {
+    if (!this.settings) {
+      throw new Error("Not authenticated. Run 'reddit-saved auth login' first.");
+    }
+    return {
+      headers: {
+        Authorization: `Bearer ${this.settings.accessToken}`,
+        "User-Agent": buildUserAgent(this.settings.username),
+      },
+      baseUrl: REDDIT_OAUTH_BASE_URL,
+      pathSuffix: "",
+      username: this.settings.username,
+    };
   }
 
   /** Clear all auth data. Acquires lock to prevent a concurrent refresh from

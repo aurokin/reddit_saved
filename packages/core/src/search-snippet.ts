@@ -1,0 +1,4 @@
+export {
+  SEARCH_SNIPPET_HIGHLIGHT_END,
+  SEARCH_SNIPPET_HIGHLIGHT_START,
+} from "./constants";

@@ -7,6 +7,8 @@ node_modules/
 # Build output
 dist/
 *.tgz
+packages/cli/reddit-saved
+packages/cli/dist/
 
 # Bun
 bun.lockb
