@@ -8,21 +8,22 @@ Reddit Saved is a local-first archive for Reddit content: fetch once, cache in
 SQLite, then browse, search, tag, export, and selectively unsave against the
 local database instead of repeatedly hitting Reddit's slow paginated API.
 
-### Current repo status
+### What this doc is for
 
-- Core data model, CLI, web app, and companion extension all exist in code.
-- The web build and workspace typecheck pass.
-- The test surface is broad, but the full suite is not clean yet: current
-  failures are concentrated in OAuth/auth persistence tests.
+- Read this file for the stable system shape.
+- Use it to understand package responsibilities and invariants.
+- Do not use it as a work tracker or execution plan.
 
 ### Reader path
 
-- Read this file for the system shape, invariants, and decision record.
-- Read [phase-4.md](./phase-4.md) for the web implementation harness and
-  current finish-line work.
-- Read [packages/web/README.md](../../packages/web/README.md) for day-to-day
-  web workflows.
-- Read [ADR 0001](../adr/0001-cookie-session-auth.md) for the auth-mode choice.
+- Read [README.md](./README.md) for the docs hub.
+- Read [harness/workspace.md](./harness/workspace.md) for repo-level
+  verification.
+- Read [harness/web.md](./harness/web.md) for the local web harness.
+- Read [interfaces/cli.md](./interfaces/cli.md) and
+  [interfaces/web-api.md](./interfaces/web-api.md) for surface reference.
+- Read [adr/0001-cookie-session-auth.md](./adr/0001-cookie-session-auth.md) for
+  the auth-mode decision.
 
 ## System At A Glance
 
@@ -122,61 +123,12 @@ local database instead of repeatedly hitting Reddit's slow paginated API.
   `content_origin`.
 - This is a simplification, not exact multi-origin accounting.
 
-## External Interfaces
+## Interfaces And Verification
 
-### CLI surface
-
-```text
-reddit-saved auth login|status|logout
-reddit-saved fetch [--full] [--type saved|upvoted|submitted|commented] [--limit N]
-reddit-saved search <query> [filters...]
-reddit-saved list [filters...]
-reddit-saved export [--format json|csv|markdown] [filters...]
-reddit-saved status
-reddit-saved unsave [selectors...] [--dry-run] --confirm
-reddit-saved tag list|create|rename|delete|add|remove|show
-```
-
-### Web API surface
-
-| Area | Routes |
-|---|---|
-| Auth | `/api/auth/status`, `/api/auth/login`, `/api/auth/logout`, session endpoints |
-| Posts | `/api/posts`, `/api/posts/search`, `/api/posts/:id`, post tag mutations |
-| Tags | `/api/tags` CRUD |
-| Sync | `/api/sync/status`, `/api/sync/fetch`, `/api/sync/cancel` |
-| Actions | `/api/unsave`, `/api/export`, `/api/health` |
-
-## Verification Harness
-
-### Fast checks
-
-```bash
-bun install
-bun run typecheck
-bun --cwd packages/web run build
-cd packages/cli && bun run src/index.ts --help
-```
-
-### Package-scoped checks
-
-```bash
-cd packages/core && bun test
-cd packages/cli && bun test
-cd packages/web && bun run test
-```
-
-### Current observed status
-
-- `bun run typecheck`: passes
-- `bun --cwd packages/web run build`: passes
-- `cd packages/cli && bun run src/index.ts --help`: passes
-- `bun test`: not clean; current failures are concentrated in:
-  - `packages/core/tests/token-manager.test.ts`
-  - `packages/cli/tests/auth.test.ts`
-
-The docs should treat auth persistence and OAuth flow behavior as the main
-remaining reliability hotspot, not the whole application.
+- CLI command surface: [interfaces/cli.md](./interfaces/cli.md)
+- Local web API surface: [interfaces/web-api.md](./interfaces/web-api.md)
+- Workspace verification harness: [harness/workspace.md](./harness/workspace.md)
+- Web verification harness: [harness/web.md](./harness/web.md)
 
 ## Known Limits
 
@@ -256,7 +208,7 @@ remaining reliability hotspot, not the whole application.
 - Session wins when present.
 - OAuth remains the fallback.
 
-## Appendix D: Reference Implementation Sources
+## Appendix D: Upstream Implementation Sources
 
 - `reference/saved-reddit-exporter/src/request-queue.ts`
 - `reference/saved-reddit-exporter/src/api-client.ts`

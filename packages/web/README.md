@@ -8,8 +8,9 @@ database as the CLI, and share the same auth files.
 
 If you need system shape or current implementation status, read:
 
-- [Architecture](../../docs/plans/architecture.md)
-- [Phase 4 harness](../../docs/plans/phase-4.md)
+- [Docs hub](../../docs/README.md)
+- [Architecture](../../docs/architecture.md)
+- [Web harness](../../docs/harness/web.md)
 
 ## Quickstart
 

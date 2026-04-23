@@ -1,16 +1,16 @@
-# Phase 4: Web Harness
+# Web Harness
 
 ## Purpose
 
-Phase 4 is the local web interface for the existing core + CLI stack. The web
-package is not a separate backend product; it is a same-machine operator
-surface over the same SQLite database, auth files, and sync machinery.
+This is the verification harness for the local web interface. The web package
+is not a separate backend product; it is a same-machine operator surface over
+the same SQLite database, auth files, and sync machinery.
 
 ## Read This First
 
 ### What this doc is for
 
-- Use this doc to validate and finish the web layer.
+- Use this doc to validate the web layer.
 - Use it as a harness doc, not a feature wishlist.
 - If a capability cannot be exercised through a concrete harness, it is not
   done enough.
@@ -20,11 +20,11 @@ surface over the same SQLite database, auth files, and sync machinery.
 - Run the SPA and API together against a seeded database.
 - Exercise browse, search, post detail, tags, exports, auth state, and sync.
 - Verify production build behavior.
-- Track remaining gaps and failure hotspots.
+- Make the current proof points explicit.
 
-## Current Status
+## Current Observations
 
-### Implemented
+### What is already true
 
 - Vite + React 19 SPA
 - Hono API on `Bun.serve()`
@@ -33,26 +33,26 @@ surface over the same SQLite database, auth files, and sync machinery.
 - Sync progress over SSE
 - Seed script and Playwright smoke coverage
 
-### Still not fully closed
+### What is still weakly proved
 
 - Full workspace test suite is not clean; current failures cluster around auth
   persistence and OAuth behavior.
-- Some plan-era items were simplified in implementation:
-  - Settings tag management is CRUD-oriented; tag merge is not present.
-  - The original plan assumed broader `useSuspenseQuery` usage than the current
-    codebase actually employs.
 - Long-running sync and concurrent CLI/web usage still need more confidence than
   the current smoke coverage provides.
+- Settings tag management is CRUD-oriented; tag merge is intentionally out of
+  the current scope.
 
 ## Reader Path
 
-- Read [architecture.md](./architecture.md) for system shape and invariants.
-- Read [packages/web/README.md](../../packages/web/README.md) for day-to-day
-  commands.
+- Read [../architecture.md](../architecture.md) for system shape and
+  invariants.
+- Read [../../packages/web/README.md](../../packages/web/README.md) for
+  day-to-day commands.
+- Read [../tracking.md](../tracking.md) for active hardening work.
 - Use this file to answer:
   - what harnesses exist
   - what each harness proves
-  - what still blocks a "done" call
+  - what still has weaker evidence than the rest of the package
 
 ## Web Harnesses
 
@@ -166,9 +166,10 @@ Current repo reality:
 - full workspace `bun test` is blocked by auth-related failures outside and
   alongside the web package
 
-## Exit Criteria
+## Ready Signal
 
-Call Phase 4 done when all of the following are true:
+Treat the web package as fully proved for the current scope when all of the
+following are true:
 
 - Seeded local workflow is stable and documented.
 - Web build and start flow work consistently.
@@ -178,28 +179,6 @@ Call Phase 4 done when all of the following are true:
   failures.
 - Remaining limitations are architectural tradeoffs, not regressions or
   half-built flows.
-
-## Remaining Work
-
-### P0 reliability
-
-- Fix `TokenManager` test regressions.
-- Fix CLI auth tests that depend on the same persistence behavior.
-- Re-run the full workspace suite until auth is no longer the primary blocker.
-
-### P1 confidence
-
-- Broaden end-to-end coverage for sync start/cancel/complete flows.
-- Add stronger concurrent CLI/web verification around shared SQLite and auth
-  files.
-- Tighten README instructions so operator workflows match the actual harnesses.
-
-### P2 optional polish
-
-- Add tag merge if it is still a real product requirement.
-- Revisit route-level loading strategy if the current query-based approach
-  becomes hard to reason about.
-- Add backup/restore only if it becomes a real operator need.
 
 ## Risks
 
@@ -217,6 +196,3 @@ At the current repo snapshot:
 - `bun run typecheck`: passes
 - `bun --cwd packages/web run build`: passes
 - `bun test`: fails in auth-focused suites, not across the whole product
-
-That means the web layer should be treated as feature-complete enough to finish,
-but not yet stable enough to call fully hardened.

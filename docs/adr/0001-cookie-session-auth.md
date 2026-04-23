@@ -1,7 +1,7 @@
 # ADR 0001 — Cookie-session auth via companion browser extension
 
 **Status:** Accepted (2026-04)
-**Supersedes:** the original OAuth-only design in `docs/plans/architecture.md`
+**Supersedes:** the original OAuth-only design in `docs/architecture.md`
 
 ## Context
 
