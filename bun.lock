@@ -31,6 +31,10 @@
         "typescript": "^5.7",
       },
     },
+    "packages/extension": {
+      "name": "@reddit-saved/extension",
+      "version": "0.1.0",
+    },
     "packages/web": {
       "name": "@reddit-saved/web",
       "version": "0.1.0",
@@ -293,6 +297,8 @@
     "@reddit-saved/cli": ["@reddit-saved/cli@workspace:packages/cli"],
 
     "@reddit-saved/core": ["@reddit-saved/core@workspace:packages/core"],
+
+    "@reddit-saved/extension": ["@reddit-saved/extension@workspace:packages/extension"],
 
     "@reddit-saved/web": ["@reddit-saved/web@workspace:packages/web"],
 
