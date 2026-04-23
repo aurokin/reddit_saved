@@ -1,178 +1,222 @@
-# Phase 4 — Web Implementation Plan
+# Phase 4: Web Harness
 
-## Tech Stack (locked)
+## Purpose
 
-**Frontend**
-- React 19
-- TanStack Router 1 (code-based routing)
-- TanStack Query 5
-- Tailwind CSS v4 (`@variant dark` for dark mode)
-- shadcn/ui + Radix primitives + Lucide icons
-- `@tanstack/react-virtual` for long lists
-- React state (no Zustand); React 19 Actions for forms
-- Reddit `body_html` (sanitized) over client-side markdown parsing
-- `Intl.RelativeTimeFormat` for timestamps
+Phase 4 is the local web interface for the existing core + CLI stack. The web
+package is not a separate backend product; it is a same-machine operator
+surface over the same SQLite database, auth files, and sync machinery.
 
-**API**
-- Hono on `Bun.serve()`
-- Single origin in prod (serves Vite `dist/` as SPA fallback for non-`/api/*` routes)
-- Vite dev proxy `/api/*` → `:3001`
-- Shared code with CLI: same `SqliteAdapter`, `TagManager`, `RedditApiClient`, `TokenManager`, `auth.lock`, SQLite file, sync checkpoint
+## Read This First
 
-**Tooling**
-- Biome (lint + format) — root config covers web
-- `bun test` + happy-dom + Testing Library (unit / component)
-- Playwright (e2e, with auth bypass via seeded `auth.json` + `TEST_MODE` flag)
+### What this doc is for
 
-**Error / loading pattern**
-- Global Suspense + ErrorBoundary
-- `useSuspenseQuery` + Router pending / error boundaries as the default
+- Use this doc to validate and finish the web layer.
+- Use it as a harness doc, not a feature wishlist.
+- If a capability cannot be exercised through a concrete harness, it is not
+  done enough.
 
-**CSP**
-- `img-src` / `media-src` allowlist: `i.redd.it`, `v.redd.it`, `preview.redd.it`, `external-preview.redd.it`, `a.thumbs.redditmedia.com`, `b.thumbs.redditmedia.com`
+### Primary outcomes
 
-## 4.0 — Scaffolding
+- Run the SPA and API together against a seeded database.
+- Exercise browse, search, post detail, tags, exports, auth state, and sync.
+- Verify production build behavior.
+- Track remaining gaps and failure hotspots.
 
-- Add deps: `hono`, `@tanstack/react-router`, `@tanstack/react-virtual`, `@tailwindcss/vite`, `lucide-react`, Radix primitives (`@radix-ui/react-dialog`, `-dropdown-menu`, `-popover`, `-slot`, `-tooltip`), `class-variance-authority`, `clsx`, `tailwind-merge`
-- Dev deps: `@testing-library/react`, `@testing-library/jest-dom`, `happy-dom`, `@playwright/test`
-- `vite.config.ts`: React + Tailwind v4 plugins, `/api/*` proxy to `:3001`, `@/` alias
-- `index.html`, `src/main.tsx`, `src/styles/globals.css` (`@import "tailwindcss"` + `@theme`)
-- shadcn setup (`components.json`, `lib/utils.ts`)
-- `.gitignore`: `dev-data/`, `playwright-report/`, `test-results/`
+## Current Status
 
-## 4.1 — Dev seed script
+### Implemented
 
-- `packages/web/scripts/seed.ts`: generates ~200 `RedditItem` fixtures covering:
-  - posts + comments
-  - varied subreddits, scores, dates
-  - markdown bodies
-  - image / gallery / video / external link types
-  - NSFW
-  - ~10% orphaned (`is_on_reddit = 0`)
-  - assorted tags
-- Uses `SqliteAdapter.upsertPosts()` + `TagManager` against `./dev-data/reddit-saved.db`
-- Idempotent — wipes and reseeds
-- Script: `bun run seed`
-- Doubles as Playwright test setup
+- Vite + React 19 SPA
+- Hono API on `Bun.serve()`
+- Shared SQLite/auth/core integration
+- Browse, post detail, settings, login, and home routes
+- Sync progress over SSE
+- Seed script and Playwright smoke coverage
 
-## 4.2 — API server (Hono on `Bun.serve`)
+### Still not fully closed
 
-`src/api/server.ts` boots Hono, opens shared `SqliteAdapter`, `TokenManager`, `RedditApiClient`. Respects existing `auth.lock`. Listens on `:3001`.
+- Full workspace test suite is not clean; current failures cluster around auth
+  persistence and OAuth behavior.
+- Some plan-era items were simplified in implementation:
+  - Settings tag management is CRUD-oriented; tag merge is not present.
+  - The original plan assumed broader `useSuspenseQuery` usage than the current
+    codebase actually employs.
+- Long-running sync and concurrent CLI/web usage still need more confidence than
+  the current smoke coverage provides.
 
-**Routes** (thin adapters over core):
+## Reader Path
 
-- Auth
-  - `GET /api/auth/status`
-  - `POST /api/auth/login`
-  - `POST /api/auth/logout`
-- Posts
-  - `GET /api/posts` — filters, sort, pagination
-  - `GET /api/posts/:id`
-  - `GET /api/posts/search`
-- Tags
-  - `GET /api/tags`
-  - `POST /api/tags`
-  - `PATCH /api/tags/:id`
-  - `DELETE /api/tags/:id`
-  - `POST /api/posts/:id/tags`
-  - `DELETE /api/posts/:id/tags/:tag`
-- Sync
-  - `POST /api/sync/fetch` — streams progress via SSE
-  - `GET /api/sync/status`
-  - `POST /api/unsave`
-- Export
-  - `GET /api/export?format=json|csv|markdown`
+- Read [architecture.md](./architecture.md) for system shape and invariants.
+- Read [packages/web/README.md](../../packages/web/README.md) for day-to-day
+  commands.
+- Use this file to answer:
+  - what harnesses exist
+  - what each harness proves
+  - what still blocks a "done" call
 
-**Middleware**
-- CSP headers with Reddit CDN allowlist
-- Error handler → JSON
-- Structured logger
+## Web Harnesses
 
-**Prod mode**: fallback to `dist/index.html` for non-`/api` requests.
+### 1. Seeded local harness
 
-**`TEST_MODE` env**: skips real OAuth, loads seeded `auth.json` — used by Playwright.
+Purpose: prove the SPA can render meaningful state without Reddit access.
 
-## 4.3 — SPA shell
+```bash
+bun run --filter @reddit-saved/web seed
+cd packages/web
+TEST_MODE=1 bun run dev
+```
 
-- TanStack Router (code-based) in `src/router.tsx`: `__root`, `/`, `/browse`, `/post/$id`, `/settings`, `/login`
-- Root layout: topbar (logo, global search, sync indicator, dark toggle, settings link), outlet; sidebar on `/browse` for filters
-- Providers: QueryClient, RouterProvider, ErrorBoundary + Suspense fallback
-- Dark mode: `localStorage` + `prefers-color-scheme`, Tailwind `@variant dark`
+This harness should validate:
 
-## 4.4 — Pages
+- API starts against `./dev-data/reddit-saved.db`
+- SPA loads on `:3000`
+- Browse page shows seeded items
+- Settings page can export seeded data
+- No real Reddit writes occur
 
-- **Home (`/`)**: recent posts (virtualized), top subreddits, tag cloud, auth / sync status
-- **Browse (`/browse`)**: `FilterPanel` (subreddit, author, score range, date range, tag, origin, type, orphaned) + sort + virtualized `PostList`. URL-synced filter state via Router search params
-- **Post (`/post/$id`)**: sanitized `body_html`, media (`MediaEmbed`), metadata, tag editor, Reddit link, unsave button (requires confirm dialog)
-- **Settings (`/settings`)**: auth status + re-login, sync trigger with SSE progress, DB stats, export, `TagManager` (CRUD + merge)
-- **Login (`/login`)**: polled auth status during OAuth flow
+### 2. API harness
 
-## 4.5 — Components (`src/components/`)
+Purpose: prove the web server is a thin adapter over core, not a separate
+domain implementation.
 
-- `PostCard`
-- `PostList` (virtualized)
-- `SearchBar` (debounced)
-- `FilterPanel`
-- `TagChips`
-- `TagEditor`
-- `TagManager`
-- `SyncStatus`
-- `MediaEmbed` (img / video / gallery / external link)
-- `EmptyState`
-- `ErrorState`
-- `ConfirmDialog`
-- shadcn primitives: Button, Input, Dialog, DropdownMenu, Popover, Tooltip, Badge, Separator, Skeleton
+Routes currently in play:
 
-## 4.6 — Hooks (`src/hooks/`)
+- Auth: `/api/auth/status`, `/api/auth/login`, `/api/auth/logout`, session
+  endpoints
+- Posts: `/api/posts`, `/api/posts/search`, `/api/posts/:id`
+- Tags: `/api/tags`, `/api/posts/:id/tags`
+- Sync: `/api/sync/status`, `/api/sync/fetch`, `/api/sync/cancel`
+- Actions: `/api/unsave`, `/api/export`, `/api/health`
 
-All use `useSuspenseQuery` by default:
+The harness passes when the API is thin, same-origin, and backed by shared core
+objects from `src/api/context.ts`.
 
-- `usePosts`
-- `useSearchPosts`
-- `usePost`
-- `useTags`
-- `usePostTags`
-- `useAuthStatus`
-- `useSyncStatus` (SSE)
-- `useExport`
-- `useUnsave`
+### 3. UI harness
 
-## 4.7 — Testing
+Purpose: prove the SPA is a usable local operator surface, not just connected
+components.
 
-**Component (`bun test` + happy-dom + Testing Library)**
-- `PostCard`
-- `FilterPanel`
-- `TagEditor`
-- `SearchBar`
-- `SyncStatus`
+Route expectations:
 
-**Playwright e2e (`packages/web/tests/e2e/`)**
+| Route | Job |
+|---|---|
+| `/` | high-level status, recent items, tag links |
+| `/browse` | filter, search, paginate, virtualized list |
+| `/post/:id` | detail view, media, tags, confirm-gated unsave |
+| `/settings` | auth state, sync state, exports, tag management |
+| `/login` | auth handoff and reconnect entry point |
 
-Seed DB → start server in `TEST_MODE` → flows:
-- Browse + filter
-- FTS search
-- Tag CRUD
-- Post detail view
-- Export
-- Unsave-with-confirm
+### 4. Sync harness
 
-## 4.8 — Docs
+Purpose: prove the web can drive and observe long-running fetch work.
 
-- Update `docs/plans/architecture.md`: Phase 4 → complete, note Hono as web-only dep, include route list
-- `packages/web/README.md`: `bun run seed`, `bun run dev`, `bun run test`, e2e instructions
+What to validate:
 
-## Milestones / Review Points
+- `GET /api/sync/fetch` streams progress via SSE
+- cancel path aborts cleanly
+- checkpoint recovery works across interrupted runs
+- sync status reflects current DB state
 
-1. **4.0 + 4.1** — scaffolding + seed working, `bun run dev` serves empty SPA against seeded DB → **review**
-2. **4.2 + hooks** — API routes + React Query hooks pass component tests → **review**
-3. **4.3 + 4.4** — SPA shell + pages rendered against seeded DB, dark mode, virtualization
-4. **4.5 polish + 4.7 e2e**
-5. **4.8 docs + final review**
+What is still weak:
 
-## Known Risks
+- sustained long-run behavior
+- concurrent CLI + web sync pressure
+- SSE behavior under heavier backpressure than smoke tests cover
 
-- TanStack Router code-based scales awkwardly past ~10 routes — revisit file-based if page count grows
-- Tailwind v4 component ecosystem still maturing; shadcn components may need minor adjustments
-- SSE from Hono on Bun — verify backpressure behavior under long syncs
-- Concurrent SQLite writes from CLI + web during sync: WAL + `busy_timeout` should cover it, but validate under load
-- Playwright OAuth bypass introduces a `TEST_MODE` codepath that must stay off in prod — enforce via assertion at server start
+### 5. Production harness
+
+Purpose: prove the package can ship as a single-process local web app.
+
+```bash
+cd packages/web
+bun run build
+bun run start
+```
+
+The harness passes when:
+
+- `dist/` builds successfully
+- the server serves both API and static assets
+- non-`/api/*` routes fall back to `dist/index.html`
+- `TEST_MODE` is rejected under `NODE_ENV=production`
+
+### 6. Test harness
+
+Purpose: keep the web package change-safe.
+
+Current layers:
+
+- component tests under `packages/web/tests`
+- API route tests under `packages/web/tests`
+- Playwright smoke test under `packages/web/tests-e2e`
+
+Recommended routine:
+
+```bash
+cd packages/web
+bun run typecheck
+bun run test
+bun run test:e2e
+```
+
+Current repo reality:
+
+- package-level typecheck is clean
+- web build is clean
+- full workspace `bun test` is blocked by auth-related failures outside and
+  alongside the web package
+
+## Exit Criteria
+
+Call Phase 4 done when all of the following are true:
+
+- Seeded local workflow is stable and documented.
+- Web build and start flow work consistently.
+- Browse, search, post detail, export, tag CRUD, and sync are covered by
+  package-level tests or smoke tests.
+- Auth mode behavior is reliable enough that it no longer dominates test
+  failures.
+- Remaining limitations are architectural tradeoffs, not regressions or
+  half-built flows.
+
+## Remaining Work
+
+### P0 reliability
+
+- Fix `TokenManager` test regressions.
+- Fix CLI auth tests that depend on the same persistence behavior.
+- Re-run the full workspace suite until auth is no longer the primary blocker.
+
+### P1 confidence
+
+- Broaden end-to-end coverage for sync start/cancel/complete flows.
+- Add stronger concurrent CLI/web verification around shared SQLite and auth
+  files.
+- Tighten README instructions so operator workflows match the actual harnesses.
+
+### P2 optional polish
+
+- Add tag merge if it is still a real product requirement.
+- Revisit route-level loading strategy if the current query-based approach
+  becomes hard to reason about.
+- Add backup/restore only if it becomes a real operator need.
+
+## Risks
+
+- Reddit still caps listing endpoints at 1000 items.
+- OAuth remains single-port and single-flight.
+- The app is intentionally single-origin and local-first; cross-origin hosting
+  would require a different sync/auth transport story.
+- `content_origin` remains a simplification rather than exact multi-origin
+  membership.
+
+## Verification Snapshot
+
+At the current repo snapshot:
+
+- `bun run typecheck`: passes
+- `bun --cwd packages/web run build`: passes
+- `bun test`: fails in auth-focused suites, not across the whole product
+
+That means the web layer should be treated as feature-complete enough to finish,
+but not yet stable enough to call fully hardened.
