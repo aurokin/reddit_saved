@@ -35,12 +35,13 @@ the same SQLite database, auth files, and sync machinery.
 
 ### What is still weakly proved
 
-- Full workspace test suite is not clean; current failures cluster around auth
-  persistence and OAuth behavior.
 - Long-running sync and concurrent CLI/web usage still need more confidence than
   the current smoke coverage provides.
 - Settings tag management is CRUD-oriented; tag merge is intentionally out of
   the current scope.
+- Component tests currently pass but emit React `act(...)` warnings around
+  BrowsePage transition updates; these warnings are not workspace harness
+  blockers.
 
 ## Reader Path
 
@@ -163,8 +164,8 @@ Current repo reality:
 
 - package-level typecheck is clean
 - web build is clean
-- full workspace `bun test` is blocked by auth-related failures outside and
-  alongside the web package
+- full workspace `bun test` is clean
+- package-script tests pass through `bun run --filter '*' test`
 
 ## Ready Signal
 
@@ -194,5 +195,5 @@ following are true:
 At the current repo snapshot:
 
 - `bun run typecheck`: passes
-- `bun --cwd packages/web run build`: passes
-- `bun test`: fails in auth-focused suites, not across the whole product
+- `bun test`: passes at the workspace root
+- `bun run --filter @reddit-saved/web build`: passes

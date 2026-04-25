@@ -23,9 +23,15 @@ Run these from the repo root unless noted otherwise:
 
 ```bash
 bun install
+bun run verify
+```
+
+`bun run verify` runs the authoritative checks in this order:
+
+```bash
 bun run typecheck
 bun test
-bun --cwd packages/web run build
+bun run --filter @reddit-saved/web build
 cd packages/cli && bun run src/index.ts --help
 ```
 
@@ -35,7 +41,7 @@ cd packages/cli && bun run src/index.ts --help
 |---|---|
 | `bun run typecheck` | Cross-package TypeScript surfaces still line up |
 | `bun test` | The shared workspace behavior is intact under the documented test harness |
-| `bun --cwd packages/web run build` | The web package can build its production SPA bundle |
+| `bun run --filter @reddit-saved/web build` | The web package can build its production SPA bundle |
 | `cd packages/cli && bun run src/index.ts --help` | The CLI entrypoint boots and command wiring is intact |
 
 ## Package-Scoped Probes
@@ -56,11 +62,12 @@ These are diagnostic harnesses, not substitutes for the root routine.
 
 At the current repo snapshot:
 
+- `bun run verify` passes
 - `bun run typecheck` passes
-- `bun --cwd packages/web run build` passes
+- `bun test` passes at the workspace root
+- `bun run --filter @reddit-saved/web build` passes
 - `cd packages/cli && bun run src/index.ts --help` passes
-- `bun test` is still blocked by auth-focused failures rather than broad
-  product gaps
+- package-script tests also pass with `bun run --filter '*' test`
 
 When this changes, update this doc rather than layering exceptions into command
 comments or issue bodies.

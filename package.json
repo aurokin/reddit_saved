@@ -6,6 +6,7 @@
     "dev:cli": "bun run --filter @reddit-saved/cli dev",
     "dev:web": "bun run --filter @reddit-saved/web dev",
     "build": "bun run --filter '*' build",
+    "verify": "bun run typecheck && bun test && bun run --filter @reddit-saved/web build && (cd packages/cli && bun run src/index.ts --help)",
     "test": "bun test",
     "lint": "bunx biome check .",
     "lint:fix": "bunx biome check --write .",

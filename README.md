@@ -16,6 +16,13 @@ TEST_MODE=1 bun run dev
 
 Then open `http://localhost:3000`.
 
+## Verification
+
+```bash
+bun install
+bun run verify
+```
+
 ## Docs
 
 - Start with [docs/README.md](./docs/README.md).
