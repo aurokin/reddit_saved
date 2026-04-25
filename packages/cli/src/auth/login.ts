@@ -3,6 +3,7 @@ import {
   type OAuthServerHandle,
   startOAuthServer,
 } from "@reddit-saved/core";
+import { flagBool, flagInt } from "../args";
 import { isHumanMode, printError, printInfo, printJson } from "../output";
 
 export async function authLogin(
@@ -15,6 +16,7 @@ export async function authLogin(
   const clientSecret =
     process.env.REDDIT_CLIENT_SECRET ??
     (typeof flags["client-secret"] === "string" ? flags["client-secret"] : undefined);
+  const port = flagInt(flags, "port");
 
   if (!clientId) {
     printError(
@@ -38,9 +40,12 @@ export async function authLogin(
     handle = await startOAuthServer({
       clientId,
       clientSecret,
+      port,
       onAuthorizeUrl: (url) => {
         printInfo(`Open this URL to authenticate:\n\n  ${url}\n`);
-        openBrowser(url);
+        if (shouldOpenBrowser(flags)) {
+          openBrowser(url);
+        }
       },
       onSuccess: (username) => {
         if (isHumanMode()) {
@@ -79,6 +84,10 @@ export async function authLogin(
     // Error already printed via onError callback
     process.exit(1);
   }
+}
+
+function shouldOpenBrowser(flags: Record<string, string | boolean>): boolean {
+  return flagBool(flags, "open-browser") || process.env.REDDIT_SAVED_OPEN_BROWSER === "1";
 }
 
 function openBrowser(url: string): void {

@@ -7,20 +7,40 @@ import { ExitCaptured, captureConsole, captureExit, makeTempDb, restoreFetch } f
 
 const originalEnv = { ...process.env };
 
+function captureBrowserSpawn(): {
+  calls: Array<Parameters<typeof Bun.spawn>>;
+  restore: () => void;
+} {
+  const calls: Array<Parameters<typeof Bun.spawn>> = [];
+  const originalSpawn = Bun.spawn;
+  Bun.spawn = ((...args: Parameters<typeof Bun.spawn>) => {
+    calls.push(args);
+    return {} as ReturnType<typeof Bun.spawn>;
+  }) as typeof Bun.spawn;
+  return {
+    calls,
+    restore: () => {
+      Bun.spawn = originalSpawn;
+    },
+  };
+}
+
 describe("auth status", () => {
   let tempDir: string;
 
   beforeEach(() => {
     tempDir = join(tmpdir(), `cli-auth-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(tempDir, { recursive: true });
-    process.env.XDG_CONFIG_HOME = tempDir;
+    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-saved");
     setOutputMode(false, false, false);
   });
 
   afterEach(() => {
     setOutputMode(false, false, false);
-    process.env.XDG_CONFIG_HOME = originalEnv.XDG_CONFIG_HOME;
-    if (!originalEnv.XDG_CONFIG_HOME) process.env.XDG_CONFIG_HOME = undefined;
+    process.env.REDDIT_SAVED_CONFIG_DIR = originalEnv.REDDIT_SAVED_CONFIG_DIR;
+    if (!originalEnv.REDDIT_SAVED_CONFIG_DIR) {
+      Reflect.deleteProperty(process.env, "REDDIT_SAVED_CONFIG_DIR");
+    }
     if (originalEnv.REDDIT_CLIENT_SECRET !== undefined) {
       process.env.REDDIT_CLIENT_SECRET = originalEnv.REDDIT_CLIENT_SECRET;
     } else {
@@ -133,14 +153,16 @@ describe("auth logout", () => {
   beforeEach(() => {
     tempDir = join(tmpdir(), `cli-auth-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(tempDir, { recursive: true });
-    process.env.XDG_CONFIG_HOME = tempDir;
+    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-saved");
     setOutputMode(false, false, false);
   });
 
   afterEach(() => {
     setOutputMode(false, false, false);
-    process.env.XDG_CONFIG_HOME = originalEnv.XDG_CONFIG_HOME;
-    if (!originalEnv.XDG_CONFIG_HOME) process.env.XDG_CONFIG_HOME = undefined;
+    process.env.REDDIT_SAVED_CONFIG_DIR = originalEnv.REDDIT_SAVED_CONFIG_DIR;
+    if (!originalEnv.REDDIT_SAVED_CONFIG_DIR) {
+      Reflect.deleteProperty(process.env, "REDDIT_SAVED_CONFIG_DIR");
+    }
     rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -163,14 +185,21 @@ describe("auth login", () => {
   beforeEach(() => {
     tempDir = join(tmpdir(), `cli-auth-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(tempDir, { recursive: true });
-    process.env.XDG_CONFIG_HOME = tempDir;
+    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-saved");
     setOutputMode(false, false, false);
   });
 
   afterEach(() => {
     setOutputMode(false, false, false);
-    process.env.XDG_CONFIG_HOME = originalEnv.XDG_CONFIG_HOME;
-    if (!originalEnv.XDG_CONFIG_HOME) process.env.XDG_CONFIG_HOME = undefined;
+    process.env.REDDIT_SAVED_CONFIG_DIR = originalEnv.REDDIT_SAVED_CONFIG_DIR;
+    if (!originalEnv.REDDIT_SAVED_CONFIG_DIR) {
+      Reflect.deleteProperty(process.env, "REDDIT_SAVED_CONFIG_DIR");
+    }
+    if (originalEnv.REDDIT_SAVED_OPEN_BROWSER !== undefined) {
+      process.env.REDDIT_SAVED_OPEN_BROWSER = originalEnv.REDDIT_SAVED_OPEN_BROWSER;
+    } else {
+      Reflect.deleteProperty(process.env, "REDDIT_SAVED_OPEN_BROWSER");
+    }
     // Clean up env vars that might have been set
     process.env.REDDIT_CLIENT_ID = undefined;
     process.env.REDDIT_CLIENT_SECRET = undefined;
@@ -333,6 +362,7 @@ describe("auth login", () => {
     process.env.REDDIT_CLIENT_SECRET = undefined;
 
     const realFetch = globalThis.fetch;
+    const spawn = captureBrowserSpawn();
 
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -359,7 +389,11 @@ describe("auth login", () => {
 
     // Start authLogin as a non-awaited promise — it will block on handle.done
     const loginPromise = authLogin(
-      { "client-id": "flag-client-id", "client-secret": "flag-client-secret" },
+      {
+        "client-id": "flag-client-id",
+        "client-secret": "flag-client-secret",
+        port: String(20_000 + Math.floor(Math.random() * 1000)),
+      },
       [],
     );
 
@@ -430,7 +464,96 @@ describe("auth login", () => {
     expect(authData.username).toBe("flaguser");
     expect(authData.accessToken).toBe("flag-access-token");
 
+    expect(spawn.calls).toHaveLength(0);
+    spawn.restore();
     restoreFetch();
+  });
+
+  test("authLogin opens browser only when --open-browser is passed", async () => {
+    process.env.REDDIT_CLIENT_ID = undefined;
+    process.env.REDDIT_CLIENT_SECRET = undefined;
+
+    const realFetch = globalThis.fetch;
+    const spawn = captureBrowserSpawn();
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+      if (url.includes("/api/v1/access_token")) {
+        return Response.json({
+          access_token: "opened-access-token",
+          refresh_token: "opened-refresh-token",
+          expires_in: 3600,
+          token_type: "bearer",
+        });
+      }
+      if (url.includes("/api/v1/me")) {
+        return Response.json({ name: "openeduser" });
+      }
+      if (url.includes("127.0.0.1") || url.includes("localhost")) {
+        return realFetch(input, init);
+      }
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    const { authLogin } = await import("../src/auth/login");
+    const cap = captureConsole();
+
+    const loginPromise = authLogin(
+      {
+        "client-id": "opened-client-id",
+        "client-secret": "opened-client-secret",
+        "open-browser": true,
+        port: String(21_000 + Math.floor(Math.random() * 1000)),
+      },
+      [],
+    );
+
+    const maxWait = 5000;
+    const start = Date.now();
+    let authorizeUrl = "";
+    while (Date.now() - start < maxWait) {
+      const urlLine = cap.errors.find((e) => e.includes("reddit.com/api/v1/authorize"));
+      if (urlLine) {
+        const match = urlLine.match(/https?:\/\/\S+/);
+        if (match) {
+          authorizeUrl = match[0];
+          break;
+        }
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+
+    expect(authorizeUrl).toContain("reddit.com/api/v1/authorize");
+    expect(spawn.calls).toHaveLength(1);
+
+    const stateMatch = authorizeUrl.match(/state=([^&]+)/);
+    const redirectMatch = authorizeUrl.match(/redirect_uri=([^&]+)/);
+    if (!stateMatch || !redirectMatch) {
+      throw new Error("Authorize URL did not include state or redirect_uri");
+    }
+    const redirectUri = decodeURIComponent(redirectMatch[1]);
+    const portMatch = redirectUri.match(/:(\d+)\//);
+    if (!portMatch) {
+      throw new Error("redirect_uri did not include a port");
+    }
+
+    const callbackUrl = `http://127.0.0.1:${portMatch[1]}/callback?code=test_code&state=${stateMatch[1]}`;
+    const callbackResp = await realFetch(callbackUrl);
+    expect(callbackResp.status).toBe(200);
+
+    try {
+      await loginPromise;
+    } finally {
+      cap.restore();
+      spawn.restore();
+      restoreFetch();
+    }
+
+    const authJsonPath = join(tempDir, "reddit-saved", "auth.json");
+    const authData = JSON.parse(await Bun.file(authJsonPath).text());
+    expect(authData.username).toBe("openeduser");
+    expect(authData.accessToken).toBe("opened-access-token");
   });
 });
 
@@ -444,14 +567,16 @@ describe("auth status — human mode", () => {
   beforeEach(() => {
     tempDir = join(tmpdir(), `cli-auth-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(tempDir, { recursive: true });
-    process.env.XDG_CONFIG_HOME = tempDir;
+    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-saved");
     setOutputMode(true, false, false);
   });
 
   afterEach(() => {
     setOutputMode(false, false, false);
-    process.env.XDG_CONFIG_HOME = originalEnv.XDG_CONFIG_HOME;
-    if (!originalEnv.XDG_CONFIG_HOME) process.env.XDG_CONFIG_HOME = undefined;
+    process.env.REDDIT_SAVED_CONFIG_DIR = originalEnv.REDDIT_SAVED_CONFIG_DIR;
+    if (!originalEnv.REDDIT_SAVED_CONFIG_DIR) {
+      Reflect.deleteProperty(process.env, "REDDIT_SAVED_CONFIG_DIR");
+    }
     if (originalEnv.REDDIT_CLIENT_SECRET !== undefined) {
       process.env.REDDIT_CLIENT_SECRET = originalEnv.REDDIT_CLIENT_SECRET;
     } else {
@@ -506,14 +631,16 @@ describe("auth logout — human mode", () => {
   beforeEach(() => {
     tempDir = join(tmpdir(), `cli-auth-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(tempDir, { recursive: true });
-    process.env.XDG_CONFIG_HOME = tempDir;
+    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-saved");
     setOutputMode(true, false, false);
   });
 
   afterEach(() => {
     setOutputMode(false, false, false);
-    process.env.XDG_CONFIG_HOME = originalEnv.XDG_CONFIG_HOME;
-    if (!originalEnv.XDG_CONFIG_HOME) process.env.XDG_CONFIG_HOME = undefined;
+    process.env.REDDIT_SAVED_CONFIG_DIR = originalEnv.REDDIT_SAVED_CONFIG_DIR;
+    if (!originalEnv.REDDIT_SAVED_CONFIG_DIR) {
+      Reflect.deleteProperty(process.env, "REDDIT_SAVED_CONFIG_DIR");
+    }
     rmSync(tempDir, { recursive: true, force: true });
   });
 

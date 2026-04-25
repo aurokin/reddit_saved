@@ -67,24 +67,24 @@ describe("session auth fallback", () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
     closeAppContext();
-    process.env.REDDIT_SAVED_DB = undefined;
+    Reflect.deleteProperty(process.env, "REDDIT_SAVED_DB");
     if (originalConfigDir === undefined) {
-      process.env.REDDIT_SAVED_CONFIG_DIR = undefined;
+      Reflect.deleteProperty(process.env, "REDDIT_SAVED_CONFIG_DIR");
     } else {
       process.env.REDDIT_SAVED_CONFIG_DIR = originalConfigDir;
     }
     if (originalDataDir === undefined) {
-      process.env.XDG_DATA_HOME = undefined;
+      Reflect.deleteProperty(process.env, "XDG_DATA_HOME");
     } else {
       process.env.XDG_DATA_HOME = originalDataDir;
     }
     if (originalClientSecret === undefined) {
-      process.env.REDDIT_CLIENT_SECRET = undefined;
+      Reflect.deleteProperty(process.env, "REDDIT_CLIENT_SECRET");
     } else {
       process.env.REDDIT_CLIENT_SECRET = originalClientSecret;
     }
     if (originalTestMode === undefined) {
-      process.env.TEST_MODE = undefined;
+      Reflect.deleteProperty(process.env, "TEST_MODE");
     } else {
       process.env.TEST_MODE = originalTestMode;
     }

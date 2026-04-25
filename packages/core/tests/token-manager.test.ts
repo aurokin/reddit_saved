@@ -67,9 +67,8 @@ beforeEach(() => {
   authFilePath = join(configDir, "auth.json");
   lockFilePath = join(configDir, "auth.lock");
 
-  // Point paths.config to our temp dir via XDG_CONFIG_HOME
-  process.env.XDG_CONFIG_HOME = tempDir;
-  // Ensure we're on "linux" path logic
+  // Point paths.config to our temp dir on every OS.
+  process.env.REDDIT_SAVED_CONFIG_DIR = configDir;
   process.env.REDDIT_CLIENT_SECRET = "test-client-secret";
 });
 
@@ -81,10 +80,10 @@ afterEach(() => {
   } else {
     process.env.REDDIT_CLIENT_SECRET = undefined;
   }
-  if (originalEnv.XDG_CONFIG_HOME !== undefined) {
-    process.env.XDG_CONFIG_HOME = originalEnv.XDG_CONFIG_HOME;
+  if (originalEnv.REDDIT_SAVED_CONFIG_DIR !== undefined) {
+    process.env.REDDIT_SAVED_CONFIG_DIR = originalEnv.REDDIT_SAVED_CONFIG_DIR;
   } else {
-    process.env.XDG_CONFIG_HOME = undefined;
+    Reflect.deleteProperty(process.env, "REDDIT_SAVED_CONFIG_DIR");
   }
   rmSync(tempDir, { recursive: true, force: true });
 });

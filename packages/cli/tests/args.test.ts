@@ -153,6 +153,12 @@ describe("parseArgs", () => {
     expect(result.flags["include-raw"]).toBe(true);
     expect(result.flags.format).toBe("json");
   });
+
+  test("--open-browser is parsed as boolean flag", () => {
+    const result = parseArgs(["auth", "login", "--open-browser", "--client-id", "cid"]);
+    expect(result.flags["open-browser"]).toBe(true);
+    expect(result.flags["client-id"]).toBe("cid");
+  });
 });
 
 describe("flagStr", () => {

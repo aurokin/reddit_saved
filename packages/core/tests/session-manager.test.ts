@@ -35,7 +35,7 @@ describe("SessionManager", () => {
     await manager.clear();
     rmSync(configDir, { recursive: true, force: true });
     if (originalConfigDir === undefined) {
-      process.env.REDDIT_SAVED_CONFIG_DIR = undefined;
+      Reflect.deleteProperty(process.env, "REDDIT_SAVED_CONFIG_DIR");
     } else {
       process.env.REDDIT_SAVED_CONFIG_DIR = originalConfigDir;
     }

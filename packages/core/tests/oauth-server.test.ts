@@ -60,19 +60,16 @@ afterAll(() => {
  * redirect the fetch calls. We do this by intercepting at the fetch level. */
 
 let originalFetch: typeof globalThis.fetch;
-let originalXdgConfig: string | undefined;
+let originalConfigDir: string | undefined;
 let tempDir: string;
 
 beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-oauth-test-"));
   originalFetch = globalThis.fetch;
 
-  // Redirect auth file writes to temp dir so tests never touch real ~/.config.
-  // NOTE: XDG_CONFIG_HOME is only used on Linux. On macOS, paths.ts uses
-  // ~/Library/Application Support regardless, so this override would not
-  // isolate writes on macOS. Tests currently assume Linux.
-  originalXdgConfig = process.env.XDG_CONFIG_HOME;
-  process.env.XDG_CONFIG_HOME = tempDir;
+  // Redirect auth file writes to temp dir so tests never touch real credentials.
+  originalConfigDir = process.env.REDDIT_SAVED_CONFIG_DIR;
+  process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-saved");
 
   // Intercept fetch calls to Reddit OAuth endpoints and redirect to mock.
   // Requests to 127.0.0.1 (the local OAuth callback server) pass through.
@@ -99,11 +96,10 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
-  if (originalXdgConfig === undefined) {
-    // biome-ignore lint/performance/noDelete: process.env assignment of undefined coerces to string "undefined"
-    delete process.env.XDG_CONFIG_HOME;
+  if (originalConfigDir === undefined) {
+    Reflect.deleteProperty(process.env, "REDDIT_SAVED_CONFIG_DIR");
   } else {
-    process.env.XDG_CONFIG_HOME = originalXdgConfig;
+    process.env.REDDIT_SAVED_CONFIG_DIR = originalConfigDir;
   }
   rmSync(tempDir, { recursive: true, force: true });
 });

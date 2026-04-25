@@ -264,7 +264,7 @@ describe("unsave command — API path", () => {
       }),
     );
 
-    process.env.XDG_CONFIG_HOME = tempDir;
+    process.env.REDDIT_SAVED_CONFIG_DIR = configDir;
     process.env.XDG_DATA_HOME = tempDir;
     process.env.REDDIT_CLIENT_SECRET = "test-secret";
   });
@@ -272,7 +272,7 @@ describe("unsave command — API path", () => {
   afterEach(() => {
     restoreFetch();
     setOutputMode(false, false, false);
-    for (const key of ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "REDDIT_CLIENT_SECRET"]) {
+    for (const key of ["REDDIT_SAVED_CONFIG_DIR", "XDG_DATA_HOME", "REDDIT_CLIENT_SECRET"]) {
       if (originalEnv[key] !== undefined) {
         process.env[key] = originalEnv[key];
       } else {

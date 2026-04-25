@@ -9,7 +9,8 @@ reddit-saved
 ## Commands
 
 ```text
-reddit-saved auth login|status|logout
+reddit-saved auth login [--open-browser]
+reddit-saved auth status|logout
 reddit-saved fetch [--full] [--type saved|upvoted|submitted|commented] [--limit N]
 reddit-saved search <query> [filters...]
 reddit-saved list [filters...]
@@ -25,3 +26,6 @@ reddit-saved tag list|create|rename|delete|add|remove|show
   database.
 - JSON-oriented output is the default shape for composable usage.
 - Auth commands use the same local auth/session files as the web app.
+- `auth login` prints the Reddit authorization URL by default. Pass
+  `--open-browser` or set `REDDIT_SAVED_OPEN_BROWSER=1` to launch it
+  automatically.

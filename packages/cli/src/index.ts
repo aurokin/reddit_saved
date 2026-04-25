@@ -63,7 +63,7 @@ const USAGE = `reddit-saved v${VERSION} — Manage your Reddit saved posts local
 Usage: reddit-saved <command> [options]
 
 Commands:
-  auth login              Authenticate with Reddit
+  auth login [--open-browser]  Authenticate with Reddit
   auth status             Show authentication status
   auth logout             Clear stored credentials
 
@@ -90,6 +90,10 @@ Global options:
   --config <path>         Override config directory (auth.json, auth.lock)
   --help                  Show this help message
   --version               Show version
+
+Auth login options:
+  --open-browser          Open the Reddit authorization URL in your browser
+  REDDIT_SAVED_OPEN_BROWSER=1 also enables automatic browser launch
 `;
 
 async function main(): Promise<void> {
