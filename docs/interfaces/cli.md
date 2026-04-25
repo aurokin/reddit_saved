@@ -25,7 +25,11 @@ reddit-saved tag list|create|rename|delete|add|remove|show
 - The CLI is the operator and automation surface over the shared local SQLite
   database.
 - JSON-oriented output is the default shape for composable usage.
-- Auth commands use the same local auth/session files as the web app.
+- CLI auth commands manage the legacy OAuth file, `auth.json`. The web app's
+  companion-extension session files, `session.json` and `session.blocked.json`,
+  are managed from the local web app.
 - `auth login` prints the Reddit authorization URL by default. Pass
   `--open-browser` or set `REDDIT_SAVED_OPEN_BROWSER=1` to launch it
   automatically.
+- `auth logout` clears OAuth credentials only; it does not disconnect the web
+  companion-extension session.

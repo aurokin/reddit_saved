@@ -9,8 +9,8 @@ export async function authLogout(
   await tokenManager.logout();
 
   if (isHumanMode()) {
-    printInfo("Logged out. Credentials cleared.");
+    printInfo("Logged out. OAuth credentials cleared.");
   } else {
-    printJson({ loggedOut: true });
+    printJson({ loggedOut: true, mode: "oauth" });
   }
 }

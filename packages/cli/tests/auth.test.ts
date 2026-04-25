@@ -56,6 +56,33 @@ describe("auth status", () => {
       await authStatus();
       const output = JSON.parse(cap.logs[0]);
       expect(output.authenticated).toBe(false);
+      expect(output.mode).toBe("oauth");
+    } finally {
+      cap.restore();
+    }
+  });
+
+  test("ignores web session files when reporting OAuth status", async () => {
+    const configDir = join(tempDir, "reddit-saved");
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      join(configDir, "session.json"),
+      JSON.stringify({
+        cookieHeader: "reddit_session=test",
+        userAgent: "unit-test",
+        modhash: "modhash",
+        username: "sessionuser",
+        capturedAt: Date.now(),
+      }),
+    );
+
+    const { authStatus } = await import("../src/auth/status");
+    const cap = captureConsole();
+    try {
+      await authStatus();
+      const output = JSON.parse(cap.logs[0]);
+      expect(output.authenticated).toBe(false);
+      expect(output.mode).toBe("oauth");
     } finally {
       cap.restore();
     }
@@ -83,6 +110,7 @@ describe("auth status", () => {
       await authStatus();
       const output = JSON.parse(cap.logs[0]);
       expect(output.authenticated).toBe(true);
+      expect(output.mode).toBe("oauth");
       expect(output.username).toBe("testuser");
       expect(output.tokenExpired).toBe(false);
       expect(output.tokenExpiresIn).toBeGreaterThan(0);
@@ -112,6 +140,7 @@ describe("auth status", () => {
       await authStatus();
       const output = JSON.parse(cap.logs[0]);
       expect(output.authenticated).toBe(true);
+      expect(output.mode).toBe("oauth");
       expect(output.tokenExpired).toBe(true);
       expect(output.tokenExpiresIn).toBe(0);
     } finally {
@@ -140,6 +169,7 @@ describe("auth status", () => {
       await authStatus({}, []);
       const output = JSON.parse(cap.logs[0]);
       expect(output.authenticated).toBe(true);
+      expect(output.mode).toBe("oauth");
       expect(output.username).toBe("nosecretuser");
     } finally {
       cap.restore();
@@ -173,6 +203,56 @@ describe("auth logout", () => {
       await authLogout();
       const output = JSON.parse(cap.logs[0]);
       expect(output.loggedOut).toBe(true);
+      expect(output.mode).toBe("oauth");
+    } finally {
+      cap.restore();
+    }
+  });
+
+  test("clears OAuth auth only and leaves web session files untouched", async () => {
+    const configDir = join(tempDir, "reddit-saved");
+    mkdirSync(configDir, { recursive: true });
+    const authPath = join(configDir, "auth.json");
+    const sessionPath = join(configDir, "session.json");
+    const sessionBlockPath = join(configDir, "session.blocked.json");
+    writeFileSync(
+      authPath,
+      JSON.stringify({
+        accessToken: "test-token",
+        refreshToken: "test-refresh",
+        tokenExpiry: Date.now() + 3600_000,
+        username: "oauthuser",
+        clientId: "test-client-id",
+      }),
+    );
+    writeFileSync(
+      sessionPath,
+      JSON.stringify({
+        cookieHeader: "reddit_session=test",
+        userAgent: "unit-test",
+        modhash: "modhash",
+        username: "sessionuser",
+        capturedAt: Date.now(),
+      }),
+    );
+    writeFileSync(
+      sessionBlockPath,
+      JSON.stringify({
+        blockedAt: Date.now(),
+        reason: "user-disconnected",
+      }),
+    );
+
+    const { authLogout } = await import("../src/auth/logout");
+    const cap = captureConsole();
+    try {
+      await authLogout({}, []);
+      const output = JSON.parse(cap.logs[0]);
+      expect(output.loggedOut).toBe(true);
+      expect(output.mode).toBe("oauth");
+      expect(existsSync(authPath)).toBe(false);
+      expect(existsSync(sessionPath)).toBe(true);
+      expect(existsSync(sessionBlockPath)).toBe(true);
     } finally {
       cap.restore();
     }
@@ -590,7 +670,7 @@ describe("auth status — human mode", () => {
     const cap = captureConsole();
     try {
       await authStatus();
-      expect(cap.logs[0]).toContain("Not authenticated");
+      expect(cap.logs[0]).toContain("OAuth not authenticated");
     } finally {
       cap.restore();
     }
@@ -616,7 +696,7 @@ describe("auth status — human mode", () => {
     try {
       await authStatus();
       const allOutput = cap.logs.join("\n");
-      expect(allOutput).toContain("Authentication");
+      expect(allOutput).toContain("OAuth Authentication");
       expect(allOutput).toContain("humanuser");
       expect(allOutput).toContain("valid");
     } finally {
@@ -649,7 +729,7 @@ describe("auth logout — human mode", () => {
     const cap = captureConsole();
     try {
       await authLogout();
-      expect(cap.errors[0]).toContain("Logged out");
+      expect(cap.errors[0]).toContain("OAuth credentials cleared");
     } finally {
       cap.restore();
     }

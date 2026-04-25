@@ -10,9 +10,9 @@ export async function authStatus(
 
   if (!settings) {
     if (isHumanMode()) {
-      console.log("Not authenticated. Run 'reddit-saved auth login' to connect.");
+      console.log("OAuth not authenticated. Run 'reddit-saved auth login' to connect.");
     } else {
-      printJson({ authenticated: false });
+      printJson({ authenticated: false, mode: "oauth" });
     }
     return;
   }
@@ -22,7 +22,7 @@ export async function authStatus(
   const expiresIn = expired ? 0 : Math.floor((settings.tokenExpiry - now) / 1000);
 
   if (isHumanMode()) {
-    printSection("Authentication", [
+    printSection("OAuth Authentication", [
       ["Username", settings.username || "(unknown)"],
       ["Client ID", settings.clientId],
       ["Token status", expired ? "EXPIRED" : `valid (${formatExpiry(expiresIn)})`],
@@ -30,6 +30,7 @@ export async function authStatus(
   } else {
     printJson({
       authenticated: true,
+      mode: "oauth",
       username: settings.username,
       clientId: settings.clientId,
       tokenExpired: expired,
