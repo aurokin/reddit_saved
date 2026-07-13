@@ -1,3 +1,7 @@
+import { existsSync } from "node:fs";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import {
   INBOX_SYNC_DEFAULT_LIMIT,
   JOB_LOCK_STALE_MS,
@@ -10,11 +14,18 @@ import {
   syncContext,
   syncInbox,
 } from "@reddit-saved/core";
-import { flagInt, flagStr } from "../args";
+import { flagBool, flagInt, flagStr } from "../args";
 import { type CliContext, createContext } from "../context";
+import {
+  DEFAULT_JOBS_INTERVAL_SECONDS,
+  DEFAULT_JOBS_LABEL,
+  buildJobsPlist,
+  resolveJobsProgramArguments,
+} from "../launchd";
 import {
   clearProgress,
   isHumanMode,
+  printError,
   printJson,
   printProgress,
   printSection,
@@ -189,6 +200,122 @@ async function runJobStep(
       });
       return { ok: true, detail: result };
     }
+  }
+}
+
+function requireDarwin(): void {
+  if (process.platform !== "darwin") {
+    printError("launchd scheduling is only available on macOS.", "UNSUPPORTED_PLATFORM");
+    process.exit(1);
+  }
+}
+
+function plistPathForLabel(label: string): string {
+  return join(homedir(), "Library", "LaunchAgents", `${label}.plist`);
+}
+
+export async function jobsInstallLaunchdCmd(
+  flags: Record<string, string | boolean>,
+  _positionals: string[],
+): Promise<void> {
+  requireDarwin();
+
+  const label = flagStr(flags, "label") ?? DEFAULT_JOBS_LABEL;
+  const intervalSeconds = flagInt(flags, "interval-seconds") ?? DEFAULT_JOBS_INTERVAL_SECONDS;
+  const steps = flagStr(flags, "steps") ? parseJobSteps(flagStr(flags, "steps")) : undefined;
+  const load = !flagBool(flags, "no-load");
+
+  const stdoutPath = join(paths.logs, "jobs.launchd.out.log");
+  const stderrPath = join(paths.logs, "jobs.launchd.err.log");
+  const programArguments = resolveJobsProgramArguments({
+    execPath: process.execPath,
+    mainPath: Bun.main,
+    steps,
+  });
+  const plist = buildJobsPlist({
+    label,
+    intervalSeconds,
+    programArguments,
+    stdoutPath,
+    stderrPath,
+  });
+
+  const plistPath = plistPathForLabel(label);
+  await mkdir(paths.logs, { recursive: true });
+  await mkdir(dirname(plistPath), { recursive: true });
+  await writeFile(plistPath, plist);
+
+  let loaded = false;
+  if (load) {
+    // Unload first so re-installing picks up the new plist; failure is normal
+    // when the agent wasn't loaded yet.
+    await Bun.spawn(["launchctl", "unload", plistPath], {
+      stdout: "ignore",
+      stderr: "ignore",
+    }).exited;
+    const loadProc = Bun.spawn(["launchctl", "load", "-w", plistPath], {
+      stdout: "ignore",
+      stderr: "pipe",
+    });
+    const code = await loadProc.exited;
+    if (code !== 0) {
+      const stderr = await new Response(loadProc.stderr).text();
+      printError(`launchctl load failed (exit ${code}): ${stderr.trim()}`);
+      process.exit(1);
+    }
+    loaded = true;
+  }
+
+  const output = {
+    label,
+    plistPath,
+    loaded,
+    intervalSeconds,
+    programArguments,
+    stdoutPath,
+    stderrPath,
+  };
+  if (isHumanMode()) {
+    printSection("launchd Agent Installed", [
+      ["Label", label],
+      ["Plist", plistPath],
+      ["Interval", `${intervalSeconds}s`],
+      ["Loaded", loaded ? "yes" : "no (--no-load)"],
+      ["Logs", stdoutPath],
+    ]);
+    console.log();
+  } else {
+    printJson(output);
+  }
+}
+
+export async function jobsUninstallLaunchdCmd(
+  flags: Record<string, string | boolean>,
+  _positionals: string[],
+): Promise<void> {
+  requireDarwin();
+
+  const label = flagStr(flags, "label") ?? DEFAULT_JOBS_LABEL;
+  const plistPath = plistPathForLabel(label);
+  const existed = existsSync(plistPath);
+
+  if (existed) {
+    await Bun.spawn(["launchctl", "unload", plistPath], {
+      stdout: "ignore",
+      stderr: "ignore",
+    }).exited;
+    await rm(plistPath, { force: true });
+  }
+
+  const output = { label, plistPath, removed: existed };
+  if (isHumanMode()) {
+    printSection("launchd Agent Removed", [
+      ["Label", label],
+      ["Plist", existed ? "removed" : "was not installed"],
+    ]);
+    console.log();
+  } else {
+    printJson(output);
   }
 }
 

@@ -59,7 +59,9 @@ provenance), and `resumeCursors`. All commands emit JSON by default; pass
 - **Refresh everything at once** → `reddit-saved jobs run` (fetch all origins →
   capture context → sync inbox → backup, skipping backup when unconfigured).
   `reddit-saved jobs status` shows recent pipeline runs; a file lock makes
-  overlapping runs skip cleanly.
+  overlapping runs skip cleanly. On macOS, `reddit-saved jobs install-launchd`
+  schedules it hourly (`reddit-saved jobs uninstall-launchd` removes it) — so
+  the archive is usually already fresh.
 
 ## Quality Filter
 

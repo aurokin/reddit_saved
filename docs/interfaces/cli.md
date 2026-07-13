@@ -30,6 +30,8 @@ reddit-saved backup sync [--push] [--no-git]
 reddit-saved backup status
 reddit-saved jobs run [--steps fetch,context,inbox,backup] [--limit N] [--trigger <name>]
 reddit-saved jobs status [--limit N]
+reddit-saved jobs install-launchd [--interval-seconds N] [--steps <list>] [--label <name>] [--no-load]
+reddit-saved jobs uninstall-launchd [--label <name>]
 ```
 
 ## Notes
@@ -85,6 +87,12 @@ reddit-saved jobs status [--limit N]
   is configured. A `.reddit-jobs.lock` file next to the database makes an
   overlapping run exit 0 with `{"skipped":true}` instead of racing; locks
   older than two hours are reclaimed as stale.
+- `jobs install-launchd` (macOS only) writes
+  `~/Library/LaunchAgents/com.reddit-saved.jobs.plist` running `jobs run
+  --trigger launchd` every `--interval-seconds` (default hourly, plus once at
+  load) and loads it via `launchctl load -w`. Logs land in the data
+  directory's `logs/` folder. Re-running the command re-installs with the new
+  settings; `jobs uninstall-launchd` unloads and deletes the plist.
 - Each fetch writes a per-origin resume checkpoint
   (`.reddit-import-checkpoint.<origin>.json` next to the database) and records
   provenance in the `sync_runs` table; `status` reports the latest run per

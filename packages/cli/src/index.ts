@@ -61,6 +61,10 @@ Commands:
   jobs run                Run the sync pipeline: fetch, context, inbox, backup
                           --steps <comma list> to run a subset, --limit N
   jobs status             Recent pipeline runs and whether one is running now
+  jobs install-launchd    Schedule the pipeline via launchd (macOS)
+                          --interval-seconds N (default 3600), --steps,
+                          --label <name>, --no-load
+  jobs uninstall-launchd  Unload and remove the launchd agent
 
 List/search/export options:
   --hide-low-quality      Exclude deleted/removed content, bot posts, and
