@@ -59,6 +59,12 @@ provenance), and `resumeCursors`. All commands emit JSON by default; pass
 - **Refresh the cache** → `reddit-cached fetch --all` (all four origins,
   incremental) or `reddit-cached fetch --type saved --full` for a full resync.
   Requires auth (browser-extension session or OAuth).
+- **Backfill beyond Reddit's ~1000-item listing cap** → request a GDPR data
+  export at reddit.com/settings/data-request, unzip it, then
+  `reddit-cached import <dir>` — hydrates every exported id not already in
+  the archive via /api/info and stores deleted content as orphaned stubs.
+  `--dry-run` counts without touching the network or the database;
+  `--types saved,upvoted` restricts origins.
 - **Refresh everything at once** → `reddit-cached jobs run` (fetch all origins →
   capture context → sync inbox → backup, skipping backup when unconfigured).
   `reddit-cached jobs status` shows recent pipeline runs; a file lock makes

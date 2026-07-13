@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
+  INFO_BATCH_MAX,
   buildCommentContextRequest,
   buildCommentThreadRequest,
   buildCommentsRequest,
   buildContentPageRequest,
   buildInboxPageRequest,
+  buildInfoRequest,
   buildMeRequest,
   buildUnsaveRequest,
   buildUserAgent,
@@ -99,6 +101,41 @@ describe("buildInboxPageRequest", () => {
   test("clamps page size to 1..100", () => {
     expect(buildInboxPageRequest(bearerAuth(), "inbox", 500).url).toContain("limit=100");
     expect(buildInboxPageRequest(bearerAuth(), "inbox", 0).url).toContain("limit=1");
+  });
+});
+
+describe("buildInfoRequest", () => {
+  test("builds OAuth /api/info URL with comma-joined fullnames", () => {
+    const params = buildInfoRequest(bearerAuth(), ["t3_abc", "t1_def"]);
+    expect(params.url).toBe(`${REDDIT_OAUTH_BASE_URL}/api/info?raw_json=1&id=t3_abc,t1_def`);
+    expect(params.method).toBe("GET");
+    expect(params.headers?.Authorization).toBe("Bearer tok");
+  });
+
+  test("cookie mode appends .json before the query", () => {
+    const params = buildInfoRequest(cookieAuth(), ["t3_abc"]);
+    expect(params.url).toBe("https://www.reddit.com/api/info.json?raw_json=1&id=t3_abc");
+    expect(params.headers?.Cookie).toBe("reddit_session=abc");
+    expect(params.headers?.Authorization).toBeUndefined();
+  });
+
+  test("accepts exactly INFO_BATCH_MAX fullnames", () => {
+    const fullnames = Array.from({ length: INFO_BATCH_MAX }, (_, i) => `t3_${i}`);
+    expect(() => buildInfoRequest(bearerAuth(), fullnames)).not.toThrow();
+  });
+
+  test("throws when given more than INFO_BATCH_MAX fullnames", () => {
+    const fullnames = Array.from({ length: INFO_BATCH_MAX + 1 }, (_, i) => `t3_${i}`);
+    expect(() => buildInfoRequest(bearerAuth(), fullnames)).toThrow("at most 100");
+  });
+
+  test("throws on an empty fullname list", () => {
+    expect(() => buildInfoRequest(bearerAuth(), [])).toThrow("at least one");
+  });
+
+  test("encodes each fullname but keeps the joining commas", () => {
+    const params = buildInfoRequest(bearerAuth(), ["t3_a&b", "t1_c"]);
+    expect(params.url).toContain("id=t3_a%26b,t1_c");
   });
 });
 

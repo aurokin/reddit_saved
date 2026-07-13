@@ -25,12 +25,14 @@ import type {
   UnsaveResult,
 } from "../types";
 import {
+  INFO_BATCH_MAX,
   type InboxBox,
   buildCommentContextRequest,
   buildCommentThreadRequest,
   buildCommentsRequest,
   buildContentPageRequest,
   buildInboxPageRequest,
+  buildInfoRequest,
   buildMeRequest,
   buildUnsaveRequest,
   buildUserAgent,
@@ -186,6 +188,33 @@ export class RedditApiClient {
     const listing = response.body as RedditListingResponse | null;
     const children = listing?.data?.children ?? [];
     return { items: children, after: listing?.data?.after ?? null };
+  }
+
+  // --------------------------------------------------------------------------
+  // Item lookup by fullname
+  // --------------------------------------------------------------------------
+
+  /** Fetch items by fullname via /api/info. Batching is handled internally:
+   *  the input may be any length, and each request carries at most
+   *  INFO_BATCH_MAX (100) fullnames. Fullnames Reddit no longer knows
+   *  (deleted content) are simply absent from the result. */
+  async fetchItemsByFullnames(fullnames: string[], signal?: AbortSignal): Promise<RedditItem[]> {
+    const items: RedditItem[] = [];
+
+    for (let i = 0; i < fullnames.length; i += INFO_BATCH_MAX) {
+      const batch = fullnames.slice(i, i + INFO_BATCH_MAX);
+      await this.ensureValid();
+      const auth = this.resolveAuth();
+
+      const params = buildInfoRequest(auth, batch);
+      if (signal) params.signal = signal;
+      const response = await this.requestQueue.enqueue(params);
+
+      const listing = response.body as RedditListingResponse | null;
+      items.push(...(listing?.data?.children ?? []));
+    }
+
+    return items;
   }
 
   // --------------------------------------------------------------------------

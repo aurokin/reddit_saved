@@ -39,6 +39,10 @@ Commands:
                           --window 24h|7d|since-last-job, --out, --json
   status                  Show database statistics
   export                  Export posts to JSON/CSV/Markdown
+  import <dir>            Import an unzipped Reddit GDPR data export
+                          (backfills past Reddit's ~1000-item listing cap)
+                          --types saved,upvoted,submitted,commented,
+                          --limit N, --dry-run (parse and count only)
   unsave                  Unsave posts on Reddit
 
   tag list                List all tags

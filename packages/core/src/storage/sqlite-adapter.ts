@@ -352,6 +352,23 @@ export class SqliteAdapter implements StorageAdapter {
     })();
   }
 
+  /** Which of the given fullnames already exist in posts (matched on name).
+   *  Used by the GDPR import to skip rows without clobbering richer data. */
+  getExistingPostNames(names: string[]): Set<string> {
+    const found = new Set<string>();
+    // Chunk to stay under SQLite's variable limit (999)
+    const CHUNK_SIZE = 900;
+    for (let i = 0; i < names.length; i += CHUNK_SIZE) {
+      const chunk = names.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "?").join(",");
+      const rows = this.db
+        .query(`SELECT name FROM posts WHERE name IN (${placeholders})`)
+        .all(...(chunk as SQLQueryBindings[])) as Array<{ name: string }>;
+      for (const row of rows) found.add(row.name);
+    }
+    return found;
+  }
+
   /** Saved rows whose thread context has never been captured (or was captured
    *  before refreshedBefore, epoch ms), newest saves first. */
   getContextCandidates(limit: number, refreshedBefore?: number): PostRow[] {

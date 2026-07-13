@@ -12,6 +12,7 @@ import { exportCmd } from "./export";
 import { fetchCmd } from "./fetch";
 import { fetchContextCmd } from "./fetch-context";
 import { fetchInboxCmd } from "./fetch-inbox";
+import { importCmd } from "./import";
 import { inboxCmd } from "./inbox";
 import { jobsInstallLaunchdCmd, jobsRunCmd, jobsStatusCmd, jobsUninstallLaunchdCmd } from "./jobs";
 import { linksRebuildCmd, linksSearchCmd, linksTopCmd } from "./links";
@@ -42,6 +43,7 @@ export const COMMANDS: Record<string, CommandHandler> = {
   today: todayCmd,
   status: statusCmd,
   export: exportCmd,
+  import: importCmd,
   unsave: unsaveCmd,
   "tag list": tagList,
   "tag create": tagCreate,

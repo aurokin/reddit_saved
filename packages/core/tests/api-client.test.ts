@@ -80,6 +80,9 @@ const rateHeaders = {
 let mockServer: Server<unknown>;
 let baseUrl: string;
 
+/** Fullnames requested per /api/info call, for batch-splitting assertions */
+const infoRequestIds: string[][] = [];
+
 beforeAll(() => {
   mockServer = Bun.serve({
     port: 0,
@@ -171,6 +174,23 @@ beforeAll(() => {
         // Unknown cursor
         return Response.json(
           { kind: "Listing", data: { children: [], after: null } },
+          { headers: rateHeaders },
+        );
+      }
+
+      // Item lookup by fullname (/api/info). Fullnames containing "deleted"
+      // are omitted from the response, like content Reddit no longer serves.
+      if (path === "/api/info" || path === "/api/info.json") {
+        const ids = (url.searchParams.get("id") ?? "").split(",").filter(Boolean);
+        infoRequestIds.push(ids);
+        const children = ids
+          .filter((fullname) => !fullname.includes("deleted"))
+          .map((fullname) => {
+            const [kind, id] = fullname.split("_");
+            return makeRedditItem(id, kind);
+          });
+        return Response.json(
+          { kind: "Listing", data: { children, after: null } },
           { headers: rateHeaders },
         );
       }
@@ -673,6 +693,43 @@ describe("RedditApiClient", () => {
       const result = await client.fetchSaved({ signal: controller.signal });
       expect(result.wasCancelled).toBe(true);
       expect(result.items.length).toBe(0);
+    });
+  });
+
+  describe("fetchItemsByFullnames", () => {
+    test("fetches items in a single /api/info call for <=100 fullnames", async () => {
+      infoRequestIds.length = 0;
+      const client = createClient();
+      const items = await client.fetchItemsByFullnames(["t3_one", "t1_two"]);
+
+      expect(infoRequestIds).toEqual([["t3_one", "t1_two"]]);
+      expect(items.map((i) => i.data.name)).toEqual(["t3_one", "t1_two"]);
+      expect(items[1].kind).toBe("t1");
+    });
+
+    test("splits more than 100 fullnames into batches of at most 100", async () => {
+      infoRequestIds.length = 0;
+      const fullnames = Array.from({ length: 250 }, (_, i) => `t3_item${i}`);
+      const client = createClient();
+      const items = await client.fetchItemsByFullnames(fullnames);
+
+      expect(infoRequestIds.map((ids) => ids.length)).toEqual([100, 100, 50]);
+      expect(items).toHaveLength(250);
+    });
+
+    test("omits fullnames Reddit no longer knows", async () => {
+      infoRequestIds.length = 0;
+      const client = createClient();
+      const items = await client.fetchItemsByFullnames(["t3_alive", "t3_deleted1"]);
+
+      expect(items.map((i) => i.data.name)).toEqual(["t3_alive"]);
+    });
+
+    test("returns empty array for empty input without a request", async () => {
+      infoRequestIds.length = 0;
+      const client = createClient();
+      expect(await client.fetchItemsByFullnames([])).toEqual([]);
+      expect(infoRequestIds).toEqual([]);
     });
   });
 

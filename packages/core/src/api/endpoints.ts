@@ -73,6 +73,29 @@ export function buildInboxPageRequest(
   };
 }
 
+/** Max fullnames per /api/info request (Reddit's per-request cap) */
+export const INFO_BATCH_MAX = 100;
+
+/** Build RequestParams for GET /api/info — batch item lookup by fullname
+ *  (comma-joined ids). Throws when given more than INFO_BATCH_MAX fullnames;
+ *  callers batch above that. */
+export function buildInfoRequest(auth: AuthContext, fullnames: string[]): RequestParams {
+  if (fullnames.length === 0) {
+    throw new Error("buildInfoRequest requires at least one fullname");
+  }
+  if (fullnames.length > INFO_BATCH_MAX) {
+    throw new Error(
+      `buildInfoRequest accepts at most ${INFO_BATCH_MAX} fullnames per request, got ${fullnames.length}`,
+    );
+  }
+  const ids = fullnames.map(encodeURIComponent).join(",");
+  return {
+    url: `${auth.baseUrl}/api/info${auth.pathSuffix}?raw_json=1&id=${ids}`,
+    method: "GET",
+    headers: { ...auth.headers },
+  };
+}
+
 /** Build RequestParams for POST /api/unsave */
 export function buildUnsaveRequest(auth: AuthContext, fullname: string): RequestParams {
   return {

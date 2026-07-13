@@ -189,13 +189,24 @@ export {
   buildUserAgent,
   buildContentPageRequest,
   buildInboxPageRequest,
+  buildInfoRequest,
   buildUnsaveRequest,
   buildMeRequest,
   buildCommentsRequest,
   buildCommentContextRequest,
   buildCommentThreadRequest,
+  INFO_BATCH_MAX,
 } from "./api/endpoints";
 export type { InboxBox } from "./api/endpoints";
+
+// Import (GDPR data export)
+export { parseCsv, parseCsvRecords } from "./import/csv";
+export { importGdprExport } from "./import/gdpr-import";
+export type {
+  GdprImportOptions,
+  GdprImportOriginResult,
+  GdprImportResult,
+} from "./import/gdpr-import";
 
 // Backup
 export {

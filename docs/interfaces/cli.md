@@ -20,6 +20,7 @@ reddit-cached list [filters...]
 reddit-cached research <query> [--limit N] [--since d] [--until d] [--out f.md] [--json]
 reddit-cached today [--window 24h|7d|since-last-job] [--out f.md] [--json]
 reddit-cached export [--format json|csv|markdown] [filters...]
+reddit-cached import <dir> [--types saved,upvoted,submitted,commented] [--limit N] [--dry-run]
 reddit-cached status
 reddit-cached unsave [selectors...] [--dry-run] --confirm
 reddit-cached tag list|create|rename|delete|add|remove|show
@@ -65,6 +66,15 @@ reddit-cached jobs uninstall-launchd [--label <name>]
   also mirrored into `posts` as context rows. `inbox` reads the table offline,
   unread first; `is_new` mirrors Reddit's unread flag as of the last sync and
   nothing is ever marked read on Reddit.
+- `import` backfills the archive from an unzipped Reddit GDPR data export
+  (request one at reddit.com/settings/data-request) — the way to reach past
+  Reddit's ~1000-item listing cap. It reads `saved_posts.csv`,
+  `saved_comments.csv`, `post_votes.csv` (upvotes only), `posts.csv`, and
+  `comments.csv`, skips items already in the archive, hydrates the rest via
+  `/api/info`, and stores content Reddit no longer serves as orphaned
+  `[deleted]` stubs. `--dry-run` parses and counts without network calls or
+  writes. Imports are not syncs: no `sync_runs` rows are written, and imported
+  items show as new-to-archive in `today`.
 - `links` queries a derived `link_occurrences` index of every outbound URL in
   stored content (normalized: lowercased host, no www./fragment/tracking
   params). It is maintained automatically during fetches; `links rebuild`

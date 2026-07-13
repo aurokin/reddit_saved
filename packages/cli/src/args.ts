@@ -31,6 +31,7 @@ const COMMAND_WORDS = new Set([
   "search",
   "list",
   "export",
+  "import",
   "unsave",
   "tag",
   "links",
