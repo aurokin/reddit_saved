@@ -19,6 +19,9 @@ reddit-saved export [--format json|csv|markdown] [filters...]
 reddit-saved status
 reddit-saved unsave [selectors...] [--dry-run] --confirm
 reddit-saved tag list|create|rename|delete|add|remove|show
+reddit-saved links top [--window 90d] [--exclude-reddit] [--limit N]
+reddit-saved links search <pattern> [--limit N]
+reddit-saved links rebuild
 ```
 
 ## Notes
@@ -42,6 +45,11 @@ reddit-saved tag list|create|rename|delete|add|remove|show
   `--include-context` (or `--origin context`) is passed, and they never
   participate in orphan detection. Progress is per-item via
   `context_fetched_at`; rerun the command to work through the backlog.
+- `links` queries a derived `link_occurrences` index of every outbound URL in
+  stored content (normalized: lowercased host, no www./fragment/tracking
+  params). It is maintained automatically during fetches; `links rebuild`
+  regenerates it from the posts table. `--window` accepts `90d`, `12w`, `6m`,
+  `1y`.
 - Each fetch writes a per-origin resume checkpoint
   (`.reddit-import-checkpoint.<origin>.json` next to the database) and records
   provenance in the `sync_runs` table; `status` reports the latest run per

@@ -184,6 +184,24 @@ export {
   buildCommentThreadRequest,
 } from "./api/endpoints";
 
+// Links
+export { extractUrls, canonicalizeUrl, isRedditHost } from "./links/url-extract";
+export type { CanonicalUrl } from "./links/url-extract";
+export {
+  extractPostLinks,
+  indexPostLinks,
+  rebuildLinkIndex,
+  topLinks,
+  searchLinks,
+} from "./links/link-index";
+export type {
+  LinkOccurrence,
+  LinkSearchRow,
+  LinkSource,
+  TopLink,
+  TopLinksOptions,
+} from "./links/link-index";
+
 // Filters
 export { FilterEngine, createEmptyBreakdown, isSafeRegex } from "./filters/engine";
 export { FILTER_PRESETS } from "./filters/presets";

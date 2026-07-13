@@ -3,6 +3,15 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { SEARCH_SNIPPET_HIGHLIGHT_END, SEARCH_SNIPPET_HIGHLIGHT_START } from "../constants";
 import { qualityWhereClause } from "../filters/quality";
+import {
+  type LinkSearchRow,
+  type TopLink,
+  type TopLinksOptions,
+  indexPostLinks,
+  rebuildLinkIndex as rebuildLinks,
+  searchLinks as searchLinksInDb,
+  topLinks as topLinksInDb,
+} from "../links/link-index";
 import type {
   ContentOrigin,
   DbStats,
@@ -229,6 +238,7 @@ export class SqliteAdapter implements StorageAdapter {
       for (const row of rows) {
         upsert.run(rowToBindRecord(row));
       }
+      indexPostLinks(this.db, rows);
       if (useBulk) {
         createFtsTriggers(this.db);
         rebuildFts(this.db);
@@ -277,6 +287,7 @@ export class SqliteAdapter implements StorageAdapter {
       for (const row of rows) {
         upsert.run(rowToBindRecord(row));
       }
+      indexPostLinks(this.db, rows);
     })();
   }
 
@@ -664,6 +675,23 @@ export class SqliteAdapter implements StorageAdapter {
           .run(...(chunk as SQLQueryBindings[]));
       }
     })();
+  }
+
+  // --------------------------------------------------------------------------
+  // Link index
+  // --------------------------------------------------------------------------
+
+  topLinks(opts?: TopLinksOptions): TopLink[] {
+    return topLinksInDb(this.db, opts);
+  }
+
+  searchLinks(pattern: string, opts?: { limit?: number }): LinkSearchRow[] {
+    return searchLinksInDb(this.db, pattern, opts);
+  }
+
+  /** Rebuild the derived link index from posts. Returns occurrence count. */
+  rebuildLinkIndex(): number {
+    return rebuildLinks(this.db);
   }
 
   // --------------------------------------------------------------------------

@@ -33,6 +33,7 @@ const COMMAND_WORDS = new Set([
   "export",
   "unsave",
   "tag",
+  "links",
   "create",
   "rename",
   "delete",
@@ -47,6 +48,7 @@ const SUBCOMMANDS: Record<string, Set<string>> = {
   auth: new Set(["login", "status", "logout"]),
   tag: new Set(["list", "create", "rename", "delete", "add", "remove", "show"]),
   fetch: new Set(["context"]),
+  links: new Set(["top", "search", "rebuild"]),
 };
 
 /** Flags that are always boolean — never consume the next argument as a value */
@@ -65,6 +67,7 @@ const BOOLEAN_FLAGS = new Set([
   "hide-low-quality",
   "all",
   "include-context",
+  "exclude-reddit",
 ]);
 
 export function parseArgs(argv: string[]): ParsedArgs {

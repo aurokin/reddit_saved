@@ -19,6 +19,7 @@ import { exportCmd } from "./commands/export";
 // Data commands
 import { fetchCmd } from "./commands/fetch";
 import { fetchContextCmd } from "./commands/fetch-context";
+import { linksRebuildCmd, linksSearchCmd, linksTopCmd } from "./commands/links";
 import { listCmd } from "./commands/list";
 import { searchCmd } from "./commands/search";
 import { statusCmd } from "./commands/status";
@@ -58,6 +59,9 @@ const COMMANDS: Record<string, CommandHandler> = {
   "tag add": tagAdd,
   "tag remove": tagRemove,
   "tag show": tagShow,
+  "links top": linksTopCmd,
+  "links search": linksSearchCmd,
+  "links rebuild": linksRebuildCmd,
 };
 
 const USAGE = `reddit-saved v${VERSION} — Manage your Reddit saved posts locally
@@ -88,6 +92,11 @@ Commands:
   tag add <tag> --to <id> Tag a post
   tag remove <tag> --from <id>  Untag a post
   tag show <id>           Show tags for a post
+
+  links top               Most-referenced links across your saved content
+                          --window 90d|6m|1y, --exclude-reddit, --limit N
+  links search <pattern>  Find posts referencing a URL substring
+  links rebuild           Rebuild the derived link index from posts
 
 List/search/export options:
   --hide-low-quality      Exclude deleted/removed content, bot posts, and

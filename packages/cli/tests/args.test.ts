@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { flagBool, flagInt, flagStr, mapTypeFlag, parseArgs, parseDateFlag } from "../src/args";
+import { parseWindowToSince } from "../src/commands/links";
 
 describe("parseArgs", () => {
   test("parses a simple command", () => {
@@ -18,6 +19,14 @@ describe("parseArgs", () => {
     const result = parseArgs(["tag", "create", "my-tag"]);
     expect(result.command).toEqual(["tag", "create"]);
     expect(result.positionals).toEqual(["my-tag"]);
+  });
+
+  test("parses links subcommands", () => {
+    expect(parseArgs(["links", "top", "--window", "90d"]).command).toEqual(["links", "top"]);
+    const search = parseArgs(["links", "search", "github.com"]);
+    expect(search.command).toEqual(["links", "search"]);
+    expect(search.positionals).toEqual(["github.com"]);
+    expect(parseArgs(["links", "rebuild"]).command).toEqual(["links", "rebuild"]);
   });
 
   test("parses fetch context subcommand", () => {
@@ -302,5 +311,28 @@ describe("parseDateFlag", () => {
 
   test("throws on invalid date strings", () => {
     expect(() => parseDateFlag("not-a-date", "after", "start")).toThrow("Invalid --after");
+  });
+});
+
+describe("parseWindowToSince", () => {
+  const NOW = 1_700_000_000_000; // ms
+  const DAY = 24 * 60 * 60;
+
+  test("returns undefined when no window given", () => {
+    expect(parseWindowToSince(undefined, NOW)).toBeUndefined();
+  });
+
+  test("parses days, weeks, months, years", () => {
+    expect(parseWindowToSince("90d", NOW)).toBe(1_700_000_000 - 90 * DAY);
+    expect(parseWindowToSince("2w", NOW)).toBe(1_700_000_000 - 14 * DAY);
+    expect(parseWindowToSince("6m", NOW)).toBe(1_700_000_000 - 180 * DAY);
+    expect(parseWindowToSince("1y", NOW)).toBe(1_700_000_000 - 365 * DAY);
+  });
+
+  test("throws on malformed windows", () => {
+    for (const bad of ["90", "d90", "90 d", "-5d", "90h", ""]) {
+      if (bad === "") continue; // empty means "no flag" upstream
+      expect(() => parseWindowToSince(bad, NOW)).toThrow(/Invalid --window/);
+    }
   });
 });

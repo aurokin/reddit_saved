@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { rebuildLinkIndex } from "../links/link-index";
 
 // ============================================================================
 // Ordered schema migrations
@@ -177,6 +178,33 @@ export const MIGRATIONS: readonly Migration[] = [
       // Not added to the posts_fts column list (see rules above).
       db.run("ALTER TABLE posts ADD COLUMN context_fetched_at INTEGER");
       db.run("CREATE INDEX IF NOT EXISTS idx_posts_context_fetched ON posts(context_fetched_at)");
+    },
+  },
+  {
+    version: 4,
+    name: "link index",
+    up(db) {
+      // Derived table: rebuildable from posts at any time, excluded from
+      // backups. created_utc is epoch SECONDS, copied from the owning post.
+      db.run(`CREATE TABLE IF NOT EXISTS link_occurrences (
+        post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        source TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        url TEXT NOT NULL,
+        canonical_url TEXT NOT NULL,
+        host TEXT NOT NULL,
+        created_utc INTEGER NOT NULL,
+        PRIMARY KEY (post_id, source, position)
+      )`);
+      db.run(
+        "CREATE INDEX IF NOT EXISTS idx_link_occ_canonical ON link_occurrences(canonical_url)",
+      );
+      db.run("CREATE INDEX IF NOT EXISTS idx_link_occ_host ON link_occurrences(host)");
+      db.run("CREATE INDEX IF NOT EXISTS idx_link_occ_created ON link_occurrences(created_utc)");
+      // Backfill from existing posts. runMigrations already wraps this in a
+      // transaction; rebuildLinkIndex's internal chunk transactions nest as
+      // no-ops under bun:sqlite.
+      rebuildLinkIndex(db);
     },
   },
 ];
