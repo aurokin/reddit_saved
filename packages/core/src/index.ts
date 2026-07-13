@@ -140,6 +140,13 @@ export {
   dropFtsTriggers,
   createFtsTriggers,
 } from "./storage/schema";
+export {
+  MIGRATIONS,
+  LATEST_SCHEMA_VERSION,
+  getSchemaVersion,
+  runMigrations,
+} from "./storage/migrations";
+export type { Migration } from "./storage/migrations";
 export { exportToJson, exportToCsv, exportToMarkdown } from "./storage/json-export";
 export type { ExportOptions, ExportMetadata } from "./storage/json-export";
 
