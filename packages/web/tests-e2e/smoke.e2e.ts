@@ -6,6 +6,8 @@ test.describe("smoke", () => {
     await expect(page.getByTestId("sync-status")).toBeVisible();
     await expect(page.getByTestId("nav-home")).toBeVisible();
     await expect(page.getByTestId("nav-browse")).toBeVisible();
+    await expect(page.getByTestId("nav-links")).toBeVisible();
+    await expect(page.getByTestId("nav-inbox")).toBeVisible();
     await expect(page.getByTestId("nav-settings")).toBeVisible();
   });
 
@@ -31,6 +33,23 @@ test.describe("smoke", () => {
     const subField = page.getByTestId("filter-subreddit");
     await subField.fill("typescript");
     await expect(page).toHaveURL(/subreddit=typescript/);
+  });
+
+  test("links page renders seeded outbound links", async ({ page }) => {
+    await page.goto("/links");
+    await expect(page.getByTestId("links-page")).toBeVisible();
+    // Seed generates external-link posts (github.com etc.) inside the last year;
+    // default window is 30d so switch to all-time for a deterministic hit.
+    await page.getByTestId("links-window").selectOption("all");
+    await expect(page.getByTestId("link-row").first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("inbox page renders seeded rows and syncs tab to URL", async ({ page }) => {
+    await page.goto("/inbox");
+    await expect(page.getByTestId("inbox-page")).toBeVisible();
+    await expect(page.getByTestId("inbox-row").first()).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("inbox-tab-message").click();
+    await expect(page).toHaveURL(/type=message/);
   });
 
   test("settings page shows TEST_MODE account and export buttons", async ({ page }) => {

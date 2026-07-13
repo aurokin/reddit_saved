@@ -49,6 +49,20 @@ export function RootLayout({ children }: { children: ReactNode }) {
             >
               Browse
             </Link>
+            <Link
+              to="/links"
+              className={navClass(pathname.startsWith("/links"))}
+              data-testid="nav-links"
+            >
+              Links
+            </Link>
+            <Link
+              to="/inbox"
+              className={navClass(pathname.startsWith("/inbox"))}
+              data-testid="nav-inbox"
+            >
+              Inbox
+            </Link>
           </nav>
 
           <div className="ml-auto flex flex-1 items-center justify-end gap-2">

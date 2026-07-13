@@ -11,6 +11,7 @@ import {
   type SyncRunStatus,
   createOriginCheckpointManager,
   detectOrphans,
+  syncContext,
 } from "@reddit-saved/core";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -233,6 +234,73 @@ app.get("/fetch", (c) => {
       }
       const message = err instanceof Error ? err.message : String(err);
       await send("error", { message, fetched });
+    } finally {
+      c.req.raw.signal.removeEventListener("abort", abortSync);
+      ctx.activeSync = null;
+      await stream.close();
+    }
+  });
+});
+
+// SSE sibling of /fetch for thread-context capture. Shares the activeSync
+// single-flight slot so context and fetch can't run concurrently. Does NOT
+// write sync_runs — context capture is stamped per-item on the posts rows,
+// matching the CLI's `fetch context`.
+app.get("/context", (c) => {
+  assertLocalAppOrigin(c, { allowEmptyOrigin: true });
+  const ctx = getAppContext();
+  if (ctx.activeSync) {
+    throw new HTTPException(409, { message: "A sync is already in progress" });
+  }
+  if (ctx.testMode) {
+    throw new HTTPException(400, {
+      message: "Sync is disabled in TEST_MODE — the database is pre-seeded for tests.",
+    });
+  }
+
+  const controller = new AbortController();
+  const abortSync = (): void => {
+    controller.abort(new DOMException("sync client disconnected", "AbortError"));
+  };
+  ctx.activeSync = controller;
+
+  return streamSSE(c, async (stream) => {
+    stream.onAbort(abortSync);
+    c.req.raw.signal.addEventListener("abort", abortSync, { once: true });
+
+    const send = async (event: string, data: Record<string, unknown>): Promise<void> => {
+      await stream.writeSSE({ event, data: JSON.stringify(data) });
+    };
+
+    let processed = 0;
+    try {
+      const syncClient = new RedditApiClient(
+        await ctx.authProvider.createPinnedProvider(),
+        ctx.queue,
+      );
+      await send("starting", { origin: "context" });
+
+      const result = await syncContext(ctx.storage, syncClient, {
+        signal: controller.signal,
+        onItem: (p, total) => {
+          processed = p;
+          void send("progress", { phase: "fetching", fetched: p, total });
+        },
+      });
+
+      if (result.wasCancelled) {
+        await send("incomplete", { reason: "cancelled", fetched: result.processed });
+      } else {
+        await send("complete", {
+          fetched: result.captured,
+          contextItemsStored: result.contextItemsStored,
+          failed: result.failed,
+          remaining: result.remaining,
+        });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await send("error", { message, fetched: processed });
     } finally {
       c.req.raw.signal.removeEventListener("abort", abortSync);
       ctx.activeSync = null;

@@ -17,7 +17,7 @@ machinery.
 | Today | `/api/today?hours=24` → deterministic digest + rendered markdown |
 | Inbox | `/api/inbox` (`type`, `unread`, `limit`, `offset`; items carry `storedPostId` when mirrored into posts) |
 | Jobs | `/api/jobs` → scheduled-pipeline run history |
-| Sync | `/api/sync/status`, `/api/sync/runs`, `/api/sync/fetch`, `/api/sync/cancel` |
+| Sync | `/api/sync/status`, `/api/sync/runs`, `/api/sync/fetch` (SSE), `/api/sync/context` (SSE), `/api/sync/cancel` |
 | Actions | `/api/unsave`, `/api/export`, `/api/health` |
 
 ## Notes

@@ -1,6 +1,15 @@
 import { useSyncStatus, useSyncStream } from "@/hooks/queries";
+import type { ContentOrigin } from "@/types";
 import { Loader2, RefreshCw } from "lucide-react";
+import { useState } from "react";
 import { Button } from "./ui/button";
+
+const ORIGINS: Array<{ value: ContentOrigin; label: string }> = [
+  { value: "saved", label: "Saved" },
+  { value: "upvoted", label: "Upvoted" },
+  { value: "submitted", label: "Posted" },
+  { value: "commented", label: "Comments" },
+];
 
 export function SyncStatus({
   showControls = true,
@@ -11,6 +20,7 @@ export function SyncStatus({
 }) {
   const { data, isLoading } = useSyncStatus();
   const stream = useSyncStream();
+  const [origin, setOrigin] = useState<ContentOrigin>("saved");
 
   const running = data?.isRunning || stream.isRunning;
   const last = data?.lastSyncTime;
@@ -40,11 +50,25 @@ export function SyncStatus({
       ) : null}
       {showControls ? (
         <div className="ml-auto flex gap-1">
+          <select
+            value={origin}
+            onChange={(e) => setOrigin(e.target.value as ContentOrigin)}
+            disabled={running}
+            className="h-8 rounded-md border border-[var(--color-input)] bg-transparent px-1.5 text-xs"
+            data-testid="sync-origin"
+            aria-label="Sync origin"
+          >
+            {ORIGINS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
           <Button
             size="sm"
             variant="outline"
             disabled={running}
-            onClick={() => stream.start("saved", false)}
+            onClick={() => stream.start(origin, false)}
             data-testid="sync-now"
           >
             Sync now
@@ -53,7 +77,7 @@ export function SyncStatus({
             size="sm"
             variant="ghost"
             disabled={running}
-            onClick={() => stream.start("saved", true)}
+            onClick={() => stream.start(origin, true)}
           >
             Full sync
           </Button>

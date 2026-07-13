@@ -1,5 +1,6 @@
 import { formatRelative } from "@/lib/utils";
 import type { InboxItemType, TodayDigest } from "@/types";
+import { Link } from "@tanstack/react-router";
 import { Badge } from "../ui/badge";
 
 const TYPE_LABELS: Record<InboxItemType, string> = {
@@ -21,9 +22,17 @@ export function InboxPreview({ digest }: { digest: TodayDigest | undefined }) {
     >
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Inbox</h3>
-        {inbox && inbox.unreadCount > 0 ? (
-          <Badge data-testid="inbox-unread-badge">{inbox.unreadCount} unread</Badge>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {inbox && inbox.unreadCount > 0 ? (
+            <Badge data-testid="inbox-unread-badge">{inbox.unreadCount} unread</Badge>
+          ) : null}
+          <Link
+            to="/inbox"
+            className="text-xs text-[var(--color-muted-foreground)] hover:underline"
+          >
+            View all →
+          </Link>
+        </div>
       </div>
       {items.length === 0 ? (
         <p className="text-sm text-[var(--color-muted-foreground)]">

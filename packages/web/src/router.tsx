@@ -10,11 +10,13 @@ import {
 import { queryClient } from "./lib/query-client";
 import { BrowsePage } from "./pages/BrowsePage";
 import { HomePage } from "./pages/HomePage";
+import { type InboxFilters, InboxPage } from "./pages/InboxPage";
+import { LinksPage } from "./pages/LinksPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PostPage } from "./pages/PostPage";
 import { RootLayout } from "./pages/RootLayout";
 import { SettingsPage } from "./pages/SettingsPage";
-import type { BrowseFilters } from "./types";
+import type { BrowseFilters, InboxItemType } from "./types";
 
 const rootRoute = createRootRoute({
   component: () => (
@@ -79,6 +81,31 @@ const postRoute = createRoute({
   component: PostPage,
 });
 
+const linksRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/links",
+  component: LinksPage,
+});
+
+const inboxRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/inbox",
+  component: InboxPage,
+  validateSearch: (search: Record<string, unknown>): InboxFilters => {
+    const type = search.type;
+    return {
+      type:
+        type === "comment_reply" ||
+        type === "post_reply" ||
+        type === "mention" ||
+        type === "message"
+          ? (type as InboxItemType)
+          : undefined,
+      unread: search.unread === true || search.unread === "true" ? true : undefined,
+    };
+  },
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
@@ -95,6 +122,8 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   browseRoute,
   postRoute,
+  linksRoute,
+  inboxRoute,
   settingsRoute,
   loginRoute,
 ]);

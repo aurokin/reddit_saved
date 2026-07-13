@@ -384,10 +384,12 @@ export function SyncStreamProvider({ children }: { children: ReactNode }) {
     setError(null);
     setRunning(true);
 
-    // EventSource only supports GET, so the sync endpoint stays GET-backed and
-    // relies on a server-side loopback/extension origin check.
+    // EventSource only supports GET, so the sync endpoints stay GET-backed and
+    // rely on a server-side loopback/extension origin check. "context" streams
+    // thread-context capture; everything else is an origin fetch.
     const params = new URLSearchParams({ type, full: String(full) });
-    const es = new EventSource(`/api/sync/fetch?${params}`, { withCredentials: false });
+    const url = type === "context" ? "/api/sync/context" : `/api/sync/fetch?${params}`;
+    const es = new EventSource(url, { withCredentials: false });
     sourceRef.current = es;
 
     const handle = (phase: SyncProgressEvent["phase"]) => (e: MessageEvent) => {

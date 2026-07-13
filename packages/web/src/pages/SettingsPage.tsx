@@ -1,4 +1,5 @@
 import { ErrorState } from "@/components/ErrorState";
+import { SyncControls } from "@/components/SyncControls";
 import { SyncStatus } from "@/components/SyncStatus";
 import { TagManager } from "@/components/TagManager";
 import { Button } from "@/components/ui/button";
@@ -6,8 +7,10 @@ import {
   downloadExport,
   useAuthStatus,
   useDisconnectSessionMutation,
+  useJobRuns,
   useLogoutMutation,
   useSessionStatus,
+  useSyncRuns,
   useSyncStatus,
 } from "@/hooks/queries";
 import { Link } from "@tanstack/react-router";
@@ -22,6 +25,8 @@ export function SettingsPage() {
   const sync = useSyncStatus();
   const logout = useLogoutMutation();
   const disconnect = useDisconnectSessionMutation();
+  const runs = useSyncRuns();
+  const jobs = useJobRuns();
   const [exportErr, setExportErr] = useState<unknown>(null);
   const [exportPending, setExportPending] = useState<ExportFormat | null>(null);
 
@@ -121,7 +126,8 @@ export function SettingsPage() {
 
       <section className="flex flex-col gap-3">
         <h2 className="text-base font-semibold">Sync</h2>
-        <SyncStatus />
+        <SyncStatus showControls={false} />
+        <SyncControls />
         {sync.data ? (
           <div className="grid grid-cols-2 gap-3 text-xs md:grid-cols-4">
             <Stat label="Posts" value={sync.data.stats.totalPosts} />
@@ -130,6 +136,85 @@ export function SettingsPage() {
             <Stat label="Subreddits" value={sync.data.stats.subredditCounts.length} />
           </div>
         ) : null}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-base font-semibold">Sync history</h2>
+        {runs.data && runs.data.items.length > 0 ? (
+          <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
+            <table className="w-full text-left text-sm" data-testid="sync-runs-table">
+              <thead className="bg-[var(--color-muted)] text-xs uppercase text-[var(--color-muted-foreground)]">
+                <tr>
+                  <th className="px-3 py-2">Origin</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Mode</th>
+                  <th className="px-3 py-2">Fetched</th>
+                  <th className="px-3 py-2">Finished</th>
+                  <th className="px-3 py-2">Last full sync</th>
+                </tr>
+              </thead>
+              <tbody>
+                {runs.data.items.map((run) => (
+                  <tr key={run.origin} className="border-t border-[var(--color-border)]">
+                    <td className="px-3 py-2 font-medium">{run.origin}</td>
+                    <td className="px-3 py-2">
+                      {run.lastRun?.status ?? "—"}
+                      {run.lastRun?.saturated ? " (saturated)" : ""}
+                    </td>
+                    <td className="px-3 py-2">{run.lastRun?.mode ?? "—"}</td>
+                    <td className="px-3 py-2">{run.lastRun?.fetched ?? "—"}</td>
+                    <td className="px-3 py-2">{formatRelative(run.lastRun?.finishedAt)}</td>
+                    <td className="px-3 py-2">
+                      {formatRelative(run.lastCompleteFullAt ?? undefined)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--color-muted-foreground)]">No sync runs recorded yet.</p>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-base font-semibold">Scheduled jobs</h2>
+        <p className="text-sm text-[var(--color-muted-foreground)]">
+          Pipeline runs from <code>reddit-saved jobs run</code> (manual or launchd).
+        </p>
+        {jobs.data && jobs.data.items.length > 0 ? (
+          <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
+            <table className="w-full text-left text-sm" data-testid="job-runs-table">
+              <thead className="bg-[var(--color-muted)] text-xs uppercase text-[var(--color-muted-foreground)]">
+                <tr>
+                  <th className="px-3 py-2">Started</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Trigger</th>
+                  <th className="px-3 py-2">Steps</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.data.items.map((run) => (
+                  <tr key={run.id} className="border-t border-[var(--color-border)]">
+                    <td className="px-3 py-2">{formatRelative(run.startedAt)}</td>
+                    <td className="px-3 py-2">{run.status}</td>
+                    <td className="px-3 py-2">{run.trigger}</td>
+                    <td className="px-3 py-2">
+                      {run.steps
+                        .map((s) => `${s.step}${s.ok ? "" : " ✗"}${s.skipped ? " (skipped)" : ""}`)
+                        .join(", ") || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--color-muted-foreground)]">
+            No pipeline runs yet. Install the hourly agent with{" "}
+            <code>reddit-saved jobs install-launchd</code>.
+          </p>
+        )}
       </section>
 
       <section className="flex flex-col gap-3">
