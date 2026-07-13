@@ -44,6 +44,9 @@ export type {
   SearchResult,
   DbStats,
   StorageAdapter,
+  SyncRunMode,
+  SyncRunStatus,
+  SyncRunSummary,
   // Tag types
   Tag,
   TagWithCount,
@@ -154,7 +157,7 @@ export type { ExportOptions, ExportMetadata } from "./storage/json-export";
 export { TagManager } from "./tags/tag-manager";
 
 // Sync
-export { SyncStateManager } from "./sync/state-manager";
+export { SyncStateManager, createOriginCheckpointManager } from "./sync/state-manager";
 export type { CheckpointData } from "./sync/state-manager";
 export { detectOrphans } from "./sync/diff";
 export type { OrphanDetectionResult } from "./sync/diff";

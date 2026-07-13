@@ -612,3 +612,72 @@ describe("SqliteAdapter", () => {
     rmSync(dirname(path2), { recursive: true, force: true });
   });
 });
+
+describe("sync run provenance", () => {
+  let dbPath: string;
+  let adapter: SqliteAdapter;
+
+  beforeEach(() => {
+    dbPath = makeTempDb();
+    adapter = new SqliteAdapter(dbPath);
+  });
+
+  afterEach(() => {
+    adapter.close();
+    rmSync(dirname(dbPath), { recursive: true, force: true });
+  });
+
+  test("startSyncRun records a running row and finishSyncRun completes it", () => {
+    const id = adapter.startSyncRun("saved", "full");
+    expect(id).toBeGreaterThan(0);
+    // Unfinished runs are invisible to summaries
+    expect(adapter.getSyncRunSummaries()).toHaveLength(0);
+
+    adapter.finishSyncRun(id, { status: "complete", fetched: 42, orphaned: 3, saturated: false });
+
+    const summaries = adapter.getSyncRunSummaries();
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0].origin).toBe("saved");
+    expect(summaries[0].lastRun).toMatchObject({
+      mode: "full",
+      status: "complete",
+      fetched: 42,
+      orphaned: 3,
+      saturated: false,
+    });
+    expect(summaries[0].lastCompleteFullAt).toBe(summaries[0].lastRun?.finishedAt ?? -1);
+  });
+
+  test("summaries report the latest finished run per origin", () => {
+    const first = adapter.startSyncRun("saved", "full");
+    adapter.finishSyncRun(first, { status: "complete", fetched: 100, orphaned: 0 });
+    const second = adapter.startSyncRun("saved", "incremental");
+    adapter.finishSyncRun(second, { status: "partial", fetched: 5 });
+    const upvoted = adapter.startSyncRun("upvoted", "full");
+    adapter.finishSyncRun(upvoted, { status: "errored", fetched: 0 });
+
+    const summaries = adapter.getSyncRunSummaries();
+    expect(summaries).toHaveLength(2);
+
+    const saved = summaries.find((s) => s.origin === "saved");
+    // Latest run is the incremental partial one, by highest finished_at/rowid
+    expect(saved?.lastRun?.mode).toBe("incremental");
+    expect(saved?.lastRun?.status).toBe("partial");
+    expect(saved?.lastRun?.fetched).toBe(5);
+    // ...but the last complete full sync is still remembered
+    expect(saved?.lastCompleteFullAt).not.toBeNull();
+
+    const up = summaries.find((s) => s.origin === "upvoted");
+    expect(up?.lastRun?.status).toBe("errored");
+    expect(up?.lastCompleteFullAt).toBeNull();
+  });
+
+  test("orphaned is null when not supplied and saturated round-trips", () => {
+    const id = adapter.startSyncRun("commented", "incremental");
+    adapter.finishSyncRun(id, { status: "complete", fetched: 7, saturated: true });
+
+    const [summary] = adapter.getSyncRunSummaries();
+    expect(summary.lastRun?.orphaned).toBeNull();
+    expect(summary.lastRun?.saturated).toBe(true);
+  });
+});

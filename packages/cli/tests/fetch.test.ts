@@ -291,7 +291,7 @@ describe("fetch command", () => {
       adapter.close();
     }
 
-    expect(existsSync(join(dirname(dbPath), ".reddit-import-checkpoint.json"))).toBe(true);
+    expect(existsSync(join(dirname(dbPath), ".reddit-import-checkpoint.saved.json"))).toBe(true);
   });
 
   test("resumes from checkpoint when one exists", async () => {
@@ -448,7 +448,7 @@ describe("fetch command", () => {
     }
   });
 
-  test("ignores checkpoint from a different origin", async () => {
+  test("leaves a legacy checkpoint from a different origin alone", async () => {
     const { SyncStateManager } = await import("@reddit-saved/core");
     const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.json");
     const stateManager = new SyncStateManager(checkpointPath);
@@ -481,10 +481,11 @@ describe("fetch command", () => {
     try {
       await fetchCmd({ db: dbPath }, []);
       expect(receivedUrl).not.toContain("after=upvoted_cursor_999");
-      expect(cap.errors.some((e) => e.includes("Ignoring checkpoint"))).toBe(true);
     } finally {
       cap.restore();
     }
+    // Legacy file is preserved so a future upvoted fetch can adopt it
+    expect(existsSync(checkpointPath)).toBe(true);
   });
 
   test("ignores incremental checkpoint during full fetch", async () => {
@@ -867,7 +868,7 @@ describe("fetch command", () => {
     }
 
     const { SyncStateManager } = await import("@reddit-saved/core");
-    const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.json");
+    const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.saved.json");
     const stateManager = new SyncStateManager(checkpointPath);
     const checkpoint = await stateManager.load();
     expect(checkpoint?.cursor).toBe("resume_after_page1");
@@ -889,15 +890,17 @@ describe("fetch command", () => {
       return new Response("Not Found", { status: 404 });
     }) as typeof fetch;
 
-    // Pre-create checkpoint so we can verify it survives an error
-    const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.json");
+    // Pre-create a legacy checkpoint: it should be adopted to the per-origin
+    // path, then survive the error uncleared
+    const legacyCheckpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.json");
+    const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.saved.json");
     const { SyncStateManager } = await import("@reddit-saved/core");
-    const sm = new SyncStateManager(checkpointPath);
+    const sm = new SyncStateManager(legacyCheckpointPath);
     const cp = sm.createNew();
     cp.phase = "fetching";
     cp.totalFetched = 0;
     await sm.save(cp);
-    expect(existsSync(checkpointPath)).toBe(true);
+    expect(existsSync(legacyCheckpointPath)).toBe(true);
 
     // Monkey-patch SqliteAdapter.prototype.upsertPosts to throw
     const origUpsert = SqliteAdapter.prototype.upsertPosts;
@@ -918,12 +921,14 @@ describe("fetch command", () => {
     }
     expect(threw).toBe(true);
 
-    // Checkpoint should have been preserved (not cleared) since upsert failed before clear()
+    // Checkpoint should have been preserved (not cleared) since upsert failed
+    // before clear() — adopted from the legacy path to the per-origin path
     expect(existsSync(checkpointPath)).toBe(true);
+    expect(existsSync(legacyCheckpointPath)).toBe(false);
   });
 
   test("does not advance checkpoint cursor until storage succeeds", async () => {
-    const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.json");
+    const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.saved.json");
     const { SyncStateManager } = await import("@reddit-saved/core");
     const stateManager = new SyncStateManager(checkpointPath);
     const checkpoint = stateManager.createNew();
@@ -975,5 +980,136 @@ describe("fetch command", () => {
     expect(receivedUrls[0]).toContain("after=resume_cursor_abc");
     expect(receivedUrls[1]).toContain("after=resume_cursor_abc");
     expect(existsSync(checkpointPath)).toBe(false);
+  });
+
+  test("records sync run provenance for complete and errored runs", async () => {
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+      if (url.includes("/api/v1/me")) {
+        return Response.json({ name: "testuser" }, { headers: rateHeaders });
+      }
+      if (url.includes("/user/") && url.includes("/saved")) {
+        return Response.json(makeRedditListingResponse([{ id: "prov1" }], null), {
+          headers: rateHeaders,
+        });
+      }
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    const originalFetchUpvoted = RedditApiClient.prototype.fetchUpvoted;
+    RedditApiClient.prototype.fetchUpvoted = async () => ({
+      items: [],
+      cursor: null,
+      hasMore: false,
+      wasCancelled: false,
+      wasErrored: true,
+    });
+
+    const { fetchCmd } = await import("../src/commands/fetch");
+    const cap = captureConsole();
+    try {
+      await fetchCmd({ db: dbPath, full: true }, []);
+      await fetchCmd({ db: dbPath, type: "upvoted" }, []);
+    } finally {
+      RedditApiClient.prototype.fetchUpvoted = originalFetchUpvoted;
+      cap.restore();
+    }
+
+    const adapter = new SqliteAdapter(dbPath);
+    try {
+      const summaries = adapter.getSyncRunSummaries();
+      const saved = summaries.find((s) => s.origin === "saved");
+      expect(saved?.lastRun?.mode).toBe("full");
+      expect(saved?.lastRun?.status).toBe("complete");
+      expect(saved?.lastRun?.fetched).toBe(1);
+      expect(saved?.lastCompleteFullAt).not.toBeNull();
+
+      const upvoted = summaries.find((s) => s.origin === "upvoted");
+      expect(upvoted?.lastRun?.status).toBe("errored");
+      expect(upvoted?.lastCompleteFullAt).toBeNull();
+    } finally {
+      adapter.close();
+    }
+  });
+
+  test("--all fetches every origin and continues past a failing one", async () => {
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+      if (url.includes("/api/v1/me")) {
+        return Response.json({ name: "testuser" }, { headers: rateHeaders });
+      }
+      if (url.includes("/user/") && url.includes("/saved")) {
+        return Response.json(makeRedditListingResponse([{ id: "all_s1" }], null), {
+          headers: rateHeaders,
+        });
+      }
+      if (url.includes("/user/") && url.includes("/submitted")) {
+        return Response.json(makeRedditListingResponse([{ id: "all_p1" }], null), {
+          headers: rateHeaders,
+        });
+      }
+      if (url.includes("/user/") && url.includes("/comments")) {
+        return Response.json(makeRedditListingResponse([{ id: "all_c1", kind: "t1" }], null), {
+          headers: rateHeaders,
+        });
+      }
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    // Upvoted throws outright — the loop must still run submitted and comments
+    const originalFetchUpvoted = RedditApiClient.prototype.fetchUpvoted;
+    RedditApiClient.prototype.fetchUpvoted = async () => {
+      throw new Error("upvoted listing unavailable");
+    };
+
+    const { fetchCmd } = await import("../src/commands/fetch");
+    const cap = captureConsole();
+    try {
+      await fetchCmd({ db: dbPath, all: true }, []);
+      const output = JSON.parse(cap.logs.at(-1) ?? "{}");
+      expect(output.all).toBe(true);
+      expect(output.origins).toHaveLength(4);
+
+      const byType = Object.fromEntries(output.origins.map((o: { type: string }) => [o.type, o]));
+      expect(byType.saved.fetched).toBe(1);
+      expect(byType.submitted.fetched).toBe(1);
+      expect(byType.comments.fetched).toBe(1);
+      expect(byType.upvoted.errored).toBe(true);
+      expect(byType.upvoted.error).toContain("upvoted listing unavailable");
+      expect(process.exitCode).toBe(1);
+    } finally {
+      RedditApiClient.prototype.fetchUpvoted = originalFetchUpvoted;
+      // fetchCmd sets exitCode 1 on a failed origin; reset so the test
+      // runner's own exit status isn't polluted
+      process.exitCode = 0;
+      cap.restore();
+    }
+
+    const adapter = new SqliteAdapter(dbPath);
+    try {
+      expect(adapter.getStats().totalPosts + adapter.getStats().totalComments).toBe(3);
+      const upvoted = adapter.getSyncRunSummaries().find((s) => s.origin === "upvoted");
+      expect(upvoted?.lastRun?.status).toBe("errored");
+    } finally {
+      adapter.close();
+    }
+  });
+
+  test("--all with an explicit --type exits with an error", async () => {
+    const { fetchCmd } = await import("../src/commands/fetch");
+    const cap = captureConsole();
+    const exit = captureExit();
+    try {
+      await fetchCmd({ db: dbPath, all: true, type: "saved" }, []);
+    } catch (e) {
+      expect(e).toBeInstanceOf(ExitCaptured);
+    } finally {
+      exit.restore();
+      cap.restore();
+    }
+    expect(exit.exitCode).toBe(1);
+    expect(cap.errors[0]).toContain("mutually exclusive");
   });
 });

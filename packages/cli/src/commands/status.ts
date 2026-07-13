@@ -19,6 +19,7 @@ export async function statusCmd(
   try {
     const stats = ctx.storage.getStats();
     const tags = ctx.tags.listTags();
+    const syncRuns = ctx.storage.getSyncRunSummaries();
     const resumeCursors = Object.fromEntries(
       Object.entries(CURSOR_KEYS)
         .map(([origin, key]) => [origin, ctx.storage.getSyncState(key)])
@@ -43,6 +44,24 @@ export async function statusCmd(
             `${new Date(stats.lastSyncTime).toLocaleString()} (${formatDuration(ago)} ago)`,
           ],
         ]);
+      }
+
+      if (syncRuns.length > 0) {
+        printSection(
+          "Origins",
+          syncRuns.map((s): [string, unknown] => {
+            const run = s.lastRun;
+            if (!run) return [s.origin, "never synced"];
+            const ago = formatDuration(Date.now() - run.finishedAt);
+            const parts = [
+              `${run.mode} ${run.status} ${ago} ago`,
+              `${run.fetched} fetched`,
+              ...(run.orphaned !== null ? [`${run.orphaned} orphaned`] : []),
+              ...(run.saturated ? ["saturated: Reddit exposes only the newest ~1000 items"] : []),
+            ];
+            return [s.origin, parts.join(", ")];
+          }),
+        );
       }
 
       if (stats.subredditCounts.length > 0) {
@@ -71,6 +90,7 @@ export async function statusCmd(
       printJson({
         ...stats,
         tags,
+        ...(syncRuns.length > 0 ? { syncRuns } : {}),
         ...(Object.keys(resumeCursors).length > 0 ? { resumeCursors } : {}),
       });
     }

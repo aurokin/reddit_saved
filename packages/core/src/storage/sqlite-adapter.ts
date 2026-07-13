@@ -12,6 +12,9 @@ import type {
   SearchOptions,
   SearchResult,
   StorageAdapter,
+  SyncRunMode,
+  SyncRunStatus,
+  SyncRunSummary,
 } from "../types";
 import { paths } from "../utils/paths";
 import { mapRedditItemToRow } from "./mapper";
@@ -435,6 +438,95 @@ export class SqliteAdapter implements StorageAdapter {
 
   deleteSyncState(key: string): void {
     this.db.run("DELETE FROM sync_state WHERE key = ?", [key]);
+  }
+
+  // --------------------------------------------------------------------------
+  // Sync run provenance
+  // --------------------------------------------------------------------------
+
+  /** Record the start of a sync run. Returns the run id for finishSyncRun. */
+  startSyncRun(origin: ContentOrigin, mode: SyncRunMode): number {
+    const result = this.db
+      .query(
+        "INSERT INTO sync_runs (origin, mode, started_at, status) VALUES (?, ?, ?, 'running') RETURNING id",
+      )
+      .get(origin, mode, Date.now()) as { id: number };
+    return result.id;
+  }
+
+  finishSyncRun(
+    id: number,
+    outcome: {
+      status: SyncRunStatus;
+      fetched: number;
+      orphaned?: number;
+      saturated?: boolean;
+    },
+  ): void {
+    this.db.run(
+      `UPDATE sync_runs
+       SET finished_at = ?, status = ?, fetched = ?, orphaned = ?, saturated = ?
+       WHERE id = ?`,
+      [
+        Date.now(),
+        outcome.status,
+        outcome.fetched,
+        outcome.orphaned ?? null,
+        outcome.saturated ? 1 : 0,
+        id,
+      ],
+    );
+  }
+
+  /** Latest finished run per origin, plus the last complete full sync — the
+   *  provenance agents use to judge how much to trust each origin's coverage. */
+  getSyncRunSummaries(): SyncRunSummary[] {
+    const latest = this.db
+      .query(
+        // Latest finished run per origin, id as tie-breaker for runs that
+        // finish within the same millisecond.
+        `SELECT origin, mode, started_at, finished_at, fetched, orphaned, saturated, status
+         FROM sync_runs r
+         WHERE id = (
+           SELECT id FROM sync_runs
+           WHERE origin = r.origin AND finished_at IS NOT NULL
+           ORDER BY finished_at DESC, id DESC LIMIT 1
+         )`,
+      )
+      .all() as Array<{
+      origin: ContentOrigin;
+      mode: SyncRunMode;
+      started_at: number;
+      finished_at: number;
+      fetched: number;
+      orphaned: number | null;
+      saturated: number;
+      status: SyncRunStatus;
+    }>;
+
+    const lastFull = this.db
+      .query(
+        `SELECT origin, MAX(finished_at) AS finished_at
+         FROM sync_runs
+         WHERE status = 'complete' AND mode = 'full'
+         GROUP BY origin`,
+      )
+      .all() as Array<{ origin: ContentOrigin; finished_at: number }>;
+    const lastFullByOrigin = new Map(lastFull.map((r) => [r.origin, r.finished_at]));
+
+    return latest.map((r) => ({
+      origin: r.origin,
+      lastRun: {
+        mode: r.mode,
+        startedAt: r.started_at,
+        finishedAt: r.finished_at,
+        fetched: r.fetched,
+        orphaned: r.orphaned,
+        saturated: r.saturated === 1,
+        status: r.status,
+      },
+      lastCompleteFullAt: lastFullByOrigin.get(r.origin) ?? null,
+    }));
   }
 
   // --------------------------------------------------------------------------

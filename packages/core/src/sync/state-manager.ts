@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { rename, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { ContentOrigin } from "../types";
-import { paths } from "../utils/paths";
+import { getCheckpointPathForDatabase, paths } from "../utils/paths";
 
 /**
  * In-flight checkpoint data for crash recovery during a fetch.
@@ -141,6 +141,37 @@ export class SyncStateManager {
       updatedAt: Date.now(),
     };
   }
+}
+
+/** Open the checkpoint manager for one sync origin, adopting the legacy
+ *  single-file checkpoint if it belongs to this origin. Pre-origin versions
+ *  kept one checkpoint per database, so a sync of a different origin would
+ *  clobber an interrupted full sync's resume position. */
+export async function createOriginCheckpointManager(
+  dbPath: string,
+  origin: ContentOrigin,
+  onSaveError?: (error: unknown) => void,
+): Promise<SyncStateManager> {
+  const perOriginPath = getCheckpointPathForDatabase(dbPath, origin);
+  const legacyPath = getCheckpointPathForDatabase(dbPath);
+
+  const perOriginExists = await Bun.file(perOriginPath).exists();
+  if (!perOriginExists) {
+    const legacyFile = Bun.file(legacyPath);
+    if (await legacyFile.exists()) {
+      let legacyOrigin: unknown;
+      try {
+        legacyOrigin = ((await legacyFile.json()) as { contentOrigin?: unknown }).contentOrigin;
+      } catch {
+        legacyOrigin = null; // corrupt legacy file — leave it for load() cleanup semantics
+      }
+      if (legacyOrigin === origin) {
+        await rename(legacyPath, perOriginPath);
+      }
+    }
+  }
+
+  return new SyncStateManager(perOriginPath, onSaveError);
 }
 
 const VALID_PHASES = new Set(["fetching", "storing", "cleanup"]);

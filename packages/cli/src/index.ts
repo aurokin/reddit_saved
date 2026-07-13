@@ -68,6 +68,8 @@ Commands:
   auth logout             Clear stored OAuth credentials
 
   fetch                   Fetch Reddit content into the local cache
+                          --type saved|upvoted|submitted|comments (default saved)
+                          --all fetches every type; --full resyncs from scratch
   search <query>          Full-text search saved posts
   list                    Browse saved posts with filters
   status                  Show database statistics

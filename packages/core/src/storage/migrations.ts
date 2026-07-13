@@ -146,6 +146,28 @@ export const MIGRATIONS: readonly Migration[] = [
       }
     },
   },
+  {
+    version: 2,
+    name: "sync run provenance",
+    up(db) {
+      // started_at/finished_at are epoch MILLISECONDS. finished_at NULL means
+      // the run crashed or is in flight. saturated=1 records that orphan
+      // detection was skipped because the origin sits at Reddit's ~1000-item
+      // listing cap — completeness cannot be verified past that window.
+      db.run(`CREATE TABLE IF NOT EXISTS sync_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        origin TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        started_at INTEGER NOT NULL,
+        finished_at INTEGER,
+        fetched INTEGER NOT NULL DEFAULT 0,
+        orphaned INTEGER,
+        saturated INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL
+      )`);
+      db.run("CREATE INDEX IF NOT EXISTS idx_sync_runs_origin ON sync_runs(origin, finished_at)");
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

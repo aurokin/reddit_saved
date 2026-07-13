@@ -8,9 +8,9 @@ import {
   type FetchResult,
   type OrphanDetectionResult,
   RedditApiClient,
-  SyncStateManager,
+  type SyncRunStatus,
+  createOriginCheckpointManager,
   detectOrphans,
-  getCheckpointPathForDatabase,
 } from "@reddit-saved/core";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -101,9 +101,10 @@ app.get("/fetch", (c) => {
     };
 
     let fetched = 0;
+    let syncRunId: number | null = null;
 
     try {
-      const stateManager = new SyncStateManager(getCheckpointPathForDatabase(ctx.dbPath));
+      const stateManager = await createOriginCheckpointManager(ctx.dbPath, origin);
       const loadedCheckpoint = await stateManager.load();
       const checkpoint =
         loadedCheckpoint && isCheckpointCompatible(loadedCheckpoint, origin, isFull)
@@ -152,6 +153,7 @@ app.get("/fetch", (c) => {
       await stateManager.save(checkpoint);
 
       const syncStart = Date.now();
+      syncRunId = ctx.storage.startSyncRun(origin, isFull ? "full" : "incremental");
       const result: FetchResult = await fetchMethod({
         signal: controller.signal,
         startCursor,
@@ -173,6 +175,11 @@ app.get("/fetch", (c) => {
         if (!isFull && result.cursor) {
           ctx.storage.setSyncState(getCursorKey(origin), result.cursor);
         }
+        ctx.storage.finishSyncRun(syncRunId, {
+          status: result.wasCancelled ? "cancelled" : "errored",
+          fetched: result.items.length,
+        });
+        syncRunId = null;
         await send("incomplete", {
           reason: result.wasCancelled ? "cancelled" : "errored",
           fetched: result.items.length,
@@ -197,6 +204,16 @@ app.get("/fetch", (c) => {
           // last_seen_at and would be falsely orphaned by the current clock.
           orphan = detectOrphans(ctx.storage, checkpoint.startedAt, [origin]);
         }
+        // An incremental page with more remaining is real progress but not
+        // full coverage — record it as partial so provenance doesn't overclaim.
+        const status: SyncRunStatus = !isFull && result.hasMore ? "partial" : "complete";
+        ctx.storage.finishSyncRun(syncRunId, {
+          status,
+          fetched: result.items.length,
+          orphaned: orphan?.orphanedCount,
+          saturated: orphan?.skippedOrigins.includes(origin) ?? false,
+        });
+        syncRunId = null;
         await send("complete", {
           fetched: result.items.length,
           hasMore: result.hasMore,
@@ -206,6 +223,9 @@ app.get("/fetch", (c) => {
         await stateManager.clear();
       }
     } catch (err) {
+      if (syncRunId !== null) {
+        ctx.storage.finishSyncRun(syncRunId, { status: "errored", fetched });
+      }
       const message = err instanceof Error ? err.message : String(err);
       await send("error", { message, fetched });
     } finally {

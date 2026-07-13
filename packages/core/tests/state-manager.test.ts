@@ -624,3 +624,100 @@ describe("SyncStateManager", () => {
     }
   });
 });
+
+describe("createOriginCheckpointManager", () => {
+  let dir: string;
+  let dbPath: string;
+
+  beforeEach(() => {
+    dir = makeTempDir();
+    dbPath = join(dir, "test.db");
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const legacyPath = () => join(dir, ".reddit-import-checkpoint.json");
+  const originPath = (origin: string) => join(dir, `.reddit-import-checkpoint.${origin}.json`);
+
+  test("uses a per-origin checkpoint path", async () => {
+    const { createOriginCheckpointManager } = await import("../src/sync/state-manager");
+    const manager = await createOriginCheckpointManager(dbPath, "upvoted");
+    await manager.save(manager.createNew(undefined, { contentOrigin: "upvoted" }));
+    expect(await Bun.file(originPath("upvoted")).exists()).toBe(true);
+    expect(await Bun.file(legacyPath()).exists()).toBe(false);
+  });
+
+  test("checkpoints for different origins do not clobber each other", async () => {
+    const { createOriginCheckpointManager } = await import("../src/sync/state-manager");
+    const savedManager = await createOriginCheckpointManager(dbPath, "saved");
+    const savedCp = savedManager.createNew(undefined, { contentOrigin: "saved", isFull: true });
+    savedCp.cursor = "saved_cursor";
+    await savedManager.save(savedCp);
+
+    const upvotedManager = await createOriginCheckpointManager(dbPath, "upvoted");
+    const upvotedCp = upvotedManager.createNew(undefined, { contentOrigin: "upvoted" });
+    upvotedCp.cursor = "upvoted_cursor";
+    await upvotedManager.save(upvotedCp);
+
+    const reloadedSaved = await (await createOriginCheckpointManager(dbPath, "saved")).load();
+    expect(reloadedSaved?.cursor).toBe("saved_cursor");
+    const reloadedUpvoted = await (await createOriginCheckpointManager(dbPath, "upvoted")).load();
+    expect(reloadedUpvoted?.cursor).toBe("upvoted_cursor");
+  });
+
+  test("adopts a legacy checkpoint whose origin matches", async () => {
+    const { createOriginCheckpointManager } = await import("../src/sync/state-manager");
+    writeFileSync(
+      legacyPath(),
+      JSON.stringify(makeCheckpointFixture({ contentOrigin: "saved", cursor: "legacy_cursor" })),
+    );
+
+    const manager = await createOriginCheckpointManager(dbPath, "saved");
+    const checkpoint = await manager.load();
+    expect(checkpoint?.cursor).toBe("legacy_cursor");
+    expect(await Bun.file(legacyPath()).exists()).toBe(false);
+    expect(await Bun.file(originPath("saved")).exists()).toBe(true);
+  });
+
+  test("leaves a legacy checkpoint of a different origin untouched", async () => {
+    const { createOriginCheckpointManager } = await import("../src/sync/state-manager");
+    writeFileSync(
+      legacyPath(),
+      JSON.stringify(makeCheckpointFixture({ contentOrigin: "upvoted", cursor: "upvoted_cursor" })),
+    );
+
+    const manager = await createOriginCheckpointManager(dbPath, "saved");
+    expect(await manager.load()).toBeNull();
+    // Preserved so a future upvoted sync can adopt it
+    expect(await Bun.file(legacyPath()).exists()).toBe(true);
+    expect(await Bun.file(originPath("saved")).exists()).toBe(false);
+  });
+
+  test("per-origin checkpoint wins over a matching legacy file", async () => {
+    const { createOriginCheckpointManager } = await import("../src/sync/state-manager");
+    writeFileSync(
+      legacyPath(),
+      JSON.stringify(makeCheckpointFixture({ contentOrigin: "saved", cursor: "old_legacy" })),
+    );
+    writeFileSync(
+      originPath("saved"),
+      JSON.stringify(makeCheckpointFixture({ contentOrigin: "saved", cursor: "per_origin" })),
+    );
+
+    const manager = await createOriginCheckpointManager(dbPath, "saved");
+    const checkpoint = await manager.load();
+    expect(checkpoint?.cursor).toBe("per_origin");
+    // Legacy file is not adopted or deleted when a per-origin file already exists
+    expect(await Bun.file(legacyPath()).exists()).toBe(true);
+  });
+
+  test("ignores a corrupt legacy checkpoint", async () => {
+    const { createOriginCheckpointManager } = await import("../src/sync/state-manager");
+    writeFileSync(legacyPath(), "{not json");
+
+    const manager = await createOriginCheckpointManager(dbPath, "saved");
+    expect(await manager.load()).toBeNull();
+  });
+});

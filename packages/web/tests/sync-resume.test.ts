@@ -74,7 +74,7 @@ describe("sync route checkpoint recovery", () => {
   test("resumes a full sync from a saved checkpoint cursor", async () => {
     ctx.storage.setSyncState("last_cursor_saved", "stored_incremental_cursor");
 
-    const stateManager = new SyncStateManager(getCheckpointPathForDatabase(ctx.dbPath));
+    const stateManager = new SyncStateManager(getCheckpointPathForDatabase(ctx.dbPath, "saved"));
     const checkpoint = stateManager.createNew(undefined, { contentOrigin: "saved", isFull: true });
     checkpoint.cursor = "checkpoint_cursor_999";
     checkpoint.totalFetched = 7;
@@ -94,10 +94,16 @@ describe("sync route checkpoint recovery", () => {
     await res.text();
     expect(receivedStartCursor).toBe("checkpoint_cursor_999");
     expect(await stateManager.load()).toBeNull();
+
+    const [summary] = ctx.storage.getSyncRunSummaries();
+    expect(summary.origin).toBe("saved");
+    expect(summary.lastRun?.mode).toBe("full");
+    expect(summary.lastRun?.status).toBe("complete");
+    expect(summary.lastCompleteFullAt).not.toBeNull();
   });
 
   test("preserves the updated checkpoint after an incomplete incremental sync", async () => {
-    const stateManager = new SyncStateManager(getCheckpointPathForDatabase(ctx.dbPath));
+    const stateManager = new SyncStateManager(getCheckpointPathForDatabase(ctx.dbPath, "saved"));
 
     RedditApiClient.prototype.fetchSaved = async () => ({
       items: [makeItem("partial1")],
@@ -118,6 +124,11 @@ describe("sync route checkpoint recovery", () => {
     expect(checkpoint?.cursor).toBe("resume_after_page1");
     expect(checkpoint?.totalFetched).toBe(1);
     expect(ctx.storage.getSyncState("last_cursor_saved")).toBe("resume_after_page1");
+
+    const [summary] = ctx.storage.getSyncRunSummaries();
+    expect(summary.lastRun?.status).toBe("errored");
+    expect(summary.lastRun?.fetched).toBe(1);
+    expect(summary.lastCompleteFullAt).toBeNull();
   });
 
   test("resumed full sync does not orphan items stored by the interrupted run", async () => {
@@ -126,7 +137,7 @@ describe("sync route checkpoint recovery", () => {
     ctx.storage.getDb().run("UPDATE posts SET last_seen_at = 1000 WHERE id = 'stale'");
 
     // Run 1: checkpoint created, one page stored, then interrupted.
-    const stateManager = new SyncStateManager(getCheckpointPathForDatabase(ctx.dbPath));
+    const stateManager = new SyncStateManager(getCheckpointPathForDatabase(ctx.dbPath, "saved"));
     const checkpoint = stateManager.createNew(undefined, { contentOrigin: "saved", isFull: true });
     checkpoint.cursor = "resume_cursor";
     await stateManager.save(checkpoint);
@@ -158,7 +169,9 @@ describe("sync route checkpoint recovery", () => {
     const secondDbPath = join(tempDir, "second", "test.db");
 
     bootApp(firstDbPath);
-    const firstStateManager = new SyncStateManager(getCheckpointPathForDatabase(firstDbPath));
+    const firstStateManager = new SyncStateManager(
+      getCheckpointPathForDatabase(firstDbPath, "saved"),
+    );
     const checkpoint = firstStateManager.createNew(undefined, {
       contentOrigin: "saved",
       isFull: true,
@@ -184,7 +197,7 @@ describe("sync route checkpoint recovery", () => {
     expect(receivedStartCursor).toBeUndefined();
     expect(await firstStateManager.load()).not.toBeNull();
     expect(
-      await new SyncStateManager(getCheckpointPathForDatabase(secondDbPath)).load(),
+      await new SyncStateManager(getCheckpointPathForDatabase(secondDbPath, "saved")).load(),
     ).toBeNull();
   });
 });

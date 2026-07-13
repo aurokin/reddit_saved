@@ -70,6 +70,11 @@ export const paths = {
   },
 };
 
-export function getCheckpointPathForDatabase(dbPath: string): string {
-  return join(dirname(dbPath), ".reddit-import-checkpoint.json");
+/** Checkpoint file co-located with the database. With an origin, each sync
+ *  origin gets its own file so concurrent/interleaved origin syncs can't
+ *  clobber each other's resume state. The origin-less form is the legacy
+ *  single-file location, kept for one-time adoption. */
+export function getCheckpointPathForDatabase(dbPath: string, origin?: string): string {
+  const suffix = origin ? `.${origin}` : "";
+  return join(dirname(dbPath), `.reddit-import-checkpoint${suffix}.json`);
 }

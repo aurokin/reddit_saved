@@ -529,6 +529,28 @@ export interface SearchResult extends PostRow {
   rank: number;
 }
 
+export type SyncRunMode = "full" | "incremental";
+export type SyncRunStatus = "running" | "complete" | "partial" | "errored" | "cancelled";
+
+/** Per-origin provenance summary derived from the sync_runs table. */
+export interface SyncRunSummary {
+  origin: ContentOrigin;
+  lastRun: {
+    mode: SyncRunMode;
+    /** epoch ms */
+    startedAt: number;
+    /** epoch ms */
+    finishedAt: number;
+    fetched: number;
+    orphaned: number | null;
+    /** true when orphan detection was skipped at Reddit's ~1000-item cap */
+    saturated: boolean;
+    status: SyncRunStatus;
+  } | null;
+  /** epoch ms of the last complete full sync, or null if none */
+  lastCompleteFullAt: number | null;
+}
+
 export interface DbStats {
   /** Total posts (t3) across all states — includes orphaned */
   totalPosts: number;
