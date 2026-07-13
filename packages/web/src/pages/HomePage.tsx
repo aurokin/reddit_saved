@@ -1,16 +1,23 @@
-import { EmptyState } from "@/components/EmptyState";
-import { ErrorState } from "@/components/ErrorState";
-import { PostCard } from "@/components/PostCard";
 import { SyncStatus } from "@/components/SyncStatus";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useAuthStatus, usePosts, useSyncStatus, useTags } from "@/hooks/queries";
+import { ActivityOverview } from "@/components/dashboard/ActivityOverview";
+import { ContextProgressCard } from "@/components/dashboard/ContextProgressCard";
+import { InboxPreview } from "@/components/dashboard/InboxPreview";
+import { RecentItems } from "@/components/dashboard/RecentItems";
+import { SyncHealthCard } from "@/components/dashboard/SyncHealthCard";
+import { TodayStrip } from "@/components/dashboard/TodayStrip";
+import { TopLinksCard } from "@/components/dashboard/TopLinksCard";
+import { useAuthStatus, useSyncRuns, useSyncStatus, useTags, useToday } from "@/hooks/queries";
+import type { ContentOrigin } from "@/types";
 import { Link } from "@tanstack/react-router";
-import { Archive, TagIcon } from "lucide-react";
+import { TagIcon } from "lucide-react";
+
+const ORIGINS: ContentOrigin[] = ["saved", "upvoted", "submitted", "commented"];
 
 export function HomePage() {
   const auth = useAuthStatus();
   const sync = useSyncStatus();
-  const recent = usePosts({ limit: 12, sort: "created", dir: "desc" });
+  const runs = useSyncRuns();
+  const today = useToday(24);
   const tags = useTags();
 
   const stats = sync.data?.stats;
@@ -34,54 +41,33 @@ export function HomePage() {
         </div>
       ) : null}
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard
-          label="Items archived"
-          value={stats ? String(stats.totalPosts + stats.totalComments) : "—"}
-          hint={
-            stats
-              ? `${stats.totalPosts} posts · ${stats.totalComments} comments · ${stats.orphanedCount} orphaned`
-              : undefined
-          }
-        />
-        <StatCard label="Subreddits" value={stats ? String(stats.subredditCounts.length) : "—"} />
-        <StatCard label="Tags" value={tags.data ? String(tags.data.items.length) : "—"} />
-      </section>
+      <TodayStrip />
 
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Recent</h2>
-          <Link
-            to="/browse"
-            className="text-sm text-[var(--color-muted-foreground)] hover:underline"
-          >
-            Browse all →
-          </Link>
-        </div>
-
-        {recent.isLoading ? (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <Skeleton className="h-36 w-full" />
-            <Skeleton className="h-36 w-full" />
-            <Skeleton className="h-36 w-full" />
-            <Skeleton className="h-36 w-full" />
-          </div>
-        ) : recent.isError ? (
-          <ErrorState error={recent.error} onRetry={() => recent.refetch()} />
-        ) : recent.data && recent.data.items.length > 0 ? (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {recent.data.items.slice(0, 8).map((p) => (
-              <PostCard key={p.id} post={p} compact />
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            icon={<Archive className="h-8 w-8" />}
-            title="No saved posts yet"
-            description="Run a sync from the Settings page to populate your archive."
+      <section
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+        data-testid="dashboard-sync-health"
+      >
+        {ORIGINS.map((origin) => (
+          <SyncHealthCard
+            key={origin}
+            origin={origin}
+            summary={runs.data?.items.find((r) => r.origin === origin)}
+            activeCount={stats?.activeCountByOrigin[origin]}
           />
-        )}
+        ))}
       </section>
+
+      <section className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <ActivityOverview digest={today.data?.digest} />
+        <InboxPreview digest={today.data?.digest} />
+      </section>
+
+      <section className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <TopLinksCard />
+        <ContextProgressCard stats={stats} />
+      </section>
+
+      <RecentItems />
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">Tags</h2>
@@ -107,26 +93,6 @@ export function HomePage() {
           </p>
         )}
       </section>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-}) {
-  return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
-      <div className="text-xs uppercase text-[var(--color-muted-foreground)]">{label}</div>
-      <div className="mt-1 text-2xl font-semibold">{value}</div>
-      {hint ? (
-        <div className="mt-1 text-xs text-[var(--color-muted-foreground)]">{hint}</div>
-      ) : null}
     </div>
   );
 }

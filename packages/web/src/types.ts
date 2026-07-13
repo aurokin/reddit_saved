@@ -1,12 +1,16 @@
 import type {
   ContentOrigin,
   DbStats,
+  InboxItemRow,
+  InboxItemType,
+  JobRunSummary,
   LinkSearchRow,
   PostRow,
   SearchResult,
   SyncRunSummary,
   Tag,
   TagWithCount,
+  TodayDigest,
   TopLink,
 } from "@reddit-saved/core";
 
@@ -20,6 +24,10 @@ export type {
   SyncRunSummary,
   TopLink,
   LinkSearchRow,
+  TodayDigest,
+  InboxItemRow,
+  InboxItemType,
+  JobRunSummary,
 };
 
 /** Shape returned by the `/api/posts` list endpoint. */
@@ -49,6 +57,22 @@ export interface TopLinksResponse {
 export interface LinkSearchResponse {
   items: LinkSearchRow[];
   query: string;
+}
+
+export interface TodayResponse {
+  digest: TodayDigest;
+  markdown: string;
+}
+
+export interface InboxResponse {
+  /** storedPostId is set when the item is mirrored into posts as a context row */
+  items: Array<InboxItemRow & { storedPostId: string | null }>;
+  total: number;
+  unreadCount: number;
+}
+
+export interface JobRunsResponse {
+  items: JobRunSummary[];
 }
 
 export interface AuthStatus {

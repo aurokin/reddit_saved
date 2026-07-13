@@ -9,6 +9,16 @@ test.describe("smoke", () => {
     await expect(page.getByTestId("nav-settings")).toBeVisible();
   });
 
+  test("home renders the dashboard with seeded provenance", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("dashboard-sync-health")).toBeVisible();
+    await expect(page.getByTestId("sync-health-saved")).toBeVisible();
+    await expect(page.getByTestId("today-strip")).toBeVisible();
+    await expect(page.getByTestId("inbox-preview")).toBeVisible();
+    // Seed marks the upvoted run saturated → amber warning copy
+    await expect(page.getByText("Orphan detection saturated — run a full sync")).toBeVisible();
+  });
+
   test("browse page renders filter panel and post list with seeded data", async ({ page }) => {
     await page.goto("/browse");
     await expect(page.getByTestId("filter-panel")).toBeVisible();

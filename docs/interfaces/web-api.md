@@ -14,6 +14,9 @@ machinery.
 | Posts | `/api/posts`, `/api/posts/search`, `/api/posts/:id`, post tag mutations |
 | Tags | `/api/tags` CRUD |
 | Links | `/api/links` (top links; `since`, `excludeReddit`, `limit`), `/api/links/search?q=` |
+| Today | `/api/today?hours=24` → deterministic digest + rendered markdown |
+| Inbox | `/api/inbox` (`type`, `unread`, `limit`, `offset`; items carry `storedPostId` when mirrored into posts) |
+| Jobs | `/api/jobs` → scheduled-pipeline run history |
 | Sync | `/api/sync/status`, `/api/sync/runs`, `/api/sync/fetch`, `/api/sync/cancel` |
 | Actions | `/api/unsave`, `/api/export`, `/api/health` |
 

@@ -2,6 +2,8 @@ import { type RequestInitJson, apiFetch, apiSearchParams } from "@/lib/api-clien
 import type {
   AuthStatus,
   DbStats,
+  InboxResponse,
+  JobRunsResponse,
   LinkSearchResponse,
   PostRow,
   PostsListResponse,
@@ -13,6 +15,7 @@ import type {
   SyncState,
   Tag,
   TagWithCount,
+  TodayResponse,
   TopLinksResponse,
 } from "@/types";
 /**
@@ -49,6 +52,9 @@ export const qk = {
   syncRuns: ["sync", "runs"] as const,
   topLinks: (params: Record<string, unknown>) => ["links", "top", params] as const,
   linkSearch: (params: Record<string, unknown>) => ["links", "search", params] as const,
+  today: (hours: number) => ["today", hours] as const,
+  inbox: (params: Record<string, unknown>) => ["inbox", params] as const,
+  jobRuns: ["jobs", "runs"] as const,
 };
 
 export function useAuthStatus(): UseQueryResult<AuthStatus> {
@@ -276,6 +282,32 @@ export function useLinkSearch(
   });
 }
 
+export function useToday(hours = 24): UseQueryResult<TodayResponse> {
+  return useQuery({
+    queryKey: qk.today(hours),
+    queryFn: () => apiFetch<TodayResponse>(`/api/today${apiSearchParams({ hours })}`),
+    staleTime: 60_000,
+  });
+}
+
+export function useInbox(
+  params: Record<string, string | number | boolean | undefined> = {},
+): UseQueryResult<InboxResponse> {
+  return useQuery({
+    queryKey: qk.inbox(params),
+    queryFn: () => apiFetch<InboxResponse>(`/api/inbox${apiSearchParams(params)}`),
+    staleTime: 30_000,
+  });
+}
+
+export function useJobRuns(): UseQueryResult<JobRunsResponse> {
+  return useQuery({
+    queryKey: qk.jobRuns,
+    queryFn: () => apiFetch<JobRunsResponse>("/api/jobs"),
+    staleTime: 60_000,
+  });
+}
+
 export function useUnsave(): UseMutationResult<
   { succeeded: string[]; failed: Array<{ id: string; error: string }>; cancelled: boolean },
   Error,
@@ -342,6 +374,7 @@ export function SyncStreamProvider({ children }: { children: ReactNode }) {
       qc.invalidateQueries({ queryKey: qk.syncRuns }),
       qc.invalidateQueries({ queryKey: ["posts"] }),
       qc.invalidateQueries({ queryKey: ["post"] }),
+      qc.invalidateQueries({ queryKey: ["today"] }),
     ]);
   };
 

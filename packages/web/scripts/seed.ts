@@ -8,6 +8,7 @@ import { dirname, join, resolve } from "node:path";
 import {
   CONTENT_ORIGIN_SAVED,
   type ContentOrigin,
+  type InboxItemRow,
   type RedditItem,
   SqliteAdapter,
   TagManager,
@@ -375,6 +376,93 @@ function main(): void {
     // Record last sync time so the UI has something to show
     storage.setSyncState("last_sync_time", String(Date.now()));
     storage.setSyncState("last_full_sync_time", String(Date.now()));
+
+    // Sync provenance so the dashboard health cards render real rows
+    for (const origin of ORIGINS) {
+      const runId = storage.startSyncRun(origin, origin === "saved" ? "full" : "incremental");
+      storage.finishSyncRun(runId, {
+        status: "complete",
+        fetched: byOrigin[origin].length,
+        saturated: origin === "upvoted",
+      });
+    }
+
+    // Inbox fixtures: unread reply, read mention, private message
+    const inboxRows: InboxItemRow[] = [
+      {
+        id: "inbx01",
+        name: "t1_inbx01",
+        kind: "t1",
+        type: "comment_reply",
+        author: pick(AUTHORS),
+        subject: "comment reply",
+        body: "Nice write-up, did you try the beta?",
+        dest: "you",
+        subreddit: pick(SUBREDDITS),
+        context: "/r/typescript/comments/seed0001/x/inbx01/?context=3",
+        link_title: `${pick(TITLES)} ${pick(SUFFIXES)}`,
+        parent_id: "t3_seed0001",
+        first_message_name: null,
+        created_utc: now - 3600,
+        is_new: 1,
+        fetched_at: Date.now(),
+        updated_at: Date.now(),
+        raw_json: "{}",
+      },
+      {
+        id: "inbx02",
+        name: "t1_inbx02",
+        kind: "t1",
+        type: "mention",
+        author: pick(AUTHORS),
+        subject: "username mention",
+        body: "as /u/you said earlier",
+        dest: "you",
+        subreddit: pick(SUBREDDITS),
+        context: "/r/rust/comments/seed0002/x/inbx02/?context=3",
+        link_title: `${pick(TITLES)} ${pick(SUFFIXES)}`,
+        parent_id: "t3_seed0002",
+        first_message_name: null,
+        created_utc: now - 7200,
+        is_new: 0,
+        fetched_at: Date.now(),
+        updated_at: Date.now(),
+        raw_json: "{}",
+      },
+      {
+        id: "inbx03",
+        name: "t4_inbx03",
+        kind: "t4",
+        type: "message",
+        author: pick(AUTHORS),
+        subject: "Question about your post",
+        body: "Hey, mind sharing the repo link?",
+        dest: "you",
+        subreddit: null,
+        context: null,
+        link_title: null,
+        parent_id: null,
+        first_message_name: "t4_inbx03",
+        created_utc: now - 10800,
+        is_new: 1,
+        fetched_at: Date.now(),
+        updated_at: Date.now(),
+        raw_json: "{}",
+      },
+    ];
+    storage.upsertInboxItems(inboxRows);
+
+    // One completed pipeline run for the jobs history table
+    const jobId = storage.startJobRun("manual");
+    storage.finishJobRun(jobId, {
+      status: "complete",
+      steps: [
+        { step: "fetch", ok: true, durationMs: 4200 },
+        { step: "context", ok: true, durationMs: 1800 },
+        { step: "inbox", ok: true, durationMs: 600 },
+        { step: "backup", ok: true, durationMs: 0, skipped: "not-configured" },
+      ],
+    });
 
     const stats = storage.getStats();
     console.log(
