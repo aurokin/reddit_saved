@@ -13,6 +13,8 @@ export interface ExportOptions {
    */
   orphaned?: boolean;
   kind?: "t1" | "t3";
+  /** Exclude deleted/removed content, bot posts, and low-score short comments */
+  hideLowQuality?: boolean;
   /** Max rows to export. Defaults to unlimited (paginates through all results).
    *  A value of `0` returns zero rows — pass `undefined` for unlimited. */
   limit?: number;
@@ -204,6 +206,7 @@ function fetchRows(adapter: StorageAdapter, opts?: ExportOptions): PostRow[] {
       tag: opts?.tag,
       orphaned: opts?.orphaned,
       kind: opts?.kind,
+      hideLowQuality: opts?.hideLowQuality,
     };
     const page = adapter.listPosts(listOpts);
     if (page.length === 0) break; // defensive: never spin on a broken adapter

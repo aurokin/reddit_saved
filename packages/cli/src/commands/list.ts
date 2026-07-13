@@ -46,6 +46,7 @@ export async function listCmd(
       tag: flagStr(flags, "tag"),
       orphaned: flagBool(flags, "orphaned") || undefined,
       kind: mapTypeFlag(flagStr(flags, "type")),
+      hideLowQuality: flagBool(flags, "hide-low-quality") || undefined,
       contentOrigin: originStr as ListOptions["contentOrigin"],
       sort: sortVal as "created" | "score",
       sortDirection: sortDirVal as "asc" | "desc",

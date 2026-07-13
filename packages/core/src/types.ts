@@ -497,6 +497,8 @@ export interface ListOptions {
   orphaned?: boolean | "all";
   kind?: "t1" | "t3";
   contentOrigin?: ContentOrigin;
+  /** Exclude deleted/removed content, bot posts, and low-score short comments */
+  hideLowQuality?: boolean;
   sort?: "created" | "score";
   sortDirection?: "asc" | "desc";
   limit?: number;
@@ -512,6 +514,8 @@ export interface SearchOptions {
   orphaned?: boolean | "all";
   kind?: "t1" | "t3";
   contentOrigin?: ContentOrigin;
+  /** Exclude deleted/removed content, bot posts, and low-score short comments */
+  hideLowQuality?: boolean;
   /** Unix timestamp in seconds; include rows created at or after this time */
   createdAfter?: number;
   /** Unix timestamp in seconds; include rows created at or before this time */

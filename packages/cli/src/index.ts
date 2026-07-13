@@ -82,6 +82,10 @@ Commands:
   tag remove <tag> --from <id>  Untag a post
   tag show <id>           Show tags for a post
 
+List/search/export options:
+  --hide-low-quality      Exclude deleted/removed content, bot posts, and
+                          low-score short comments
+
 Global options:
   --human, -H             Human-readable output (tables instead of JSON)
   --verbose, -v           Verbose output

@@ -30,6 +30,7 @@ export async function exportCmd(
       tag: flagStr(flags, "tag"),
       orphaned: flagBool(flags, "orphaned") || undefined,
       kind: mapTypeFlag(flagStr(flags, "type")),
+      hideLowQuality: flagBool(flags, "hide-low-quality") || undefined,
       limit: flagInt(flags, "limit"),
       includeRawJson: flagBool(flags, "include-raw"),
     };

@@ -175,6 +175,14 @@ export {
 // Filters
 export { FilterEngine, createEmptyBreakdown, isSafeRegex } from "./filters/engine";
 export { FILTER_PRESETS } from "./filters/presets";
+export {
+  LOW_QUALITY_BOT_AUTHORS,
+  LOW_QUALITY_COMMENT_MAX_SCORE,
+  LOW_QUALITY_COMMENT_MIN_LENGTH,
+  qualityReason,
+  qualityWhereClause,
+} from "./filters/quality";
+export type { QualityReason } from "./filters/quality";
 
 // Monitor
 export { PerformanceMonitor, formatDuration, formatBytes } from "./monitor/performance";

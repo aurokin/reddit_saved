@@ -61,6 +61,7 @@ const BOOLEAN_FLAGS = new Set([
   "orphaned",
   "include-raw",
   "open-browser",
+  "hide-low-quality",
 ]);
 
 export function parseArgs(argv: string[]): ParsedArgs {

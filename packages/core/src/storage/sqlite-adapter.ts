@@ -2,6 +2,7 @@ import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { SEARCH_SNIPPET_HIGHLIGHT_END, SEARCH_SNIPPET_HIGHLIGHT_START } from "../constants";
+import { qualityWhereClause } from "../filters/quality";
 import type {
   ContentOrigin,
   DbStats,
@@ -64,6 +65,9 @@ function buildListFilterParts(opts: ListOptions): { where: string[]; params: Bin
     where.push(TAG_FILTER_SQL);
     params.push(opts.tag);
   }
+  if (opts.hideLowQuality) {
+    where.push(qualityWhereClause());
+  }
 
   return { where, params };
 }
@@ -122,6 +126,9 @@ function buildSearchFilterParts(
   if (opts.tag) {
     where.push(TAG_FILTER_SQL);
     params.push(opts.tag);
+  }
+  if (opts.hideLowQuality) {
+    where.push(qualityWhereClause());
   }
 
   return { where, params };
