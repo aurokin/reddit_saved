@@ -39,7 +39,10 @@ export function buildContentPageRequest(
   after?: string | null,
 ): RequestParams {
   const clampedPageSize = Math.max(1, Math.min(100, pageSize));
-  let url = `${auth.baseUrl}/user/${encodeURIComponent(auth.username)}/${encodeURIComponent(endpoint)}${auth.pathSuffix}?limit=${clampedPageSize}`;
+  // raw_json=1 stops Reddit from HTML-escaping &, <, > in text fields — without
+  // it, titles/selftext/body are stored entity-escaped, which corrupts FTS
+  // search and renders literal entities in the UI.
+  let url = `${auth.baseUrl}/user/${encodeURIComponent(auth.username)}/${encodeURIComponent(endpoint)}${auth.pathSuffix}?raw_json=1&limit=${clampedPageSize}`;
   if (after) url += `&after=${encodeURIComponent(after)}`;
 
   return {
@@ -86,7 +89,7 @@ export function buildCommentsRequest(
   const clampedLimit = Math.max(1, Math.min(100, limit));
   const clampedDepth = Math.max(1, Math.min(10, depth));
   return {
-    url: `${auth.baseUrl}${cleanPermalink}.json?limit=${clampedLimit}&depth=${clampedDepth}&sort=${encodeURIComponent(sort)}`,
+    url: `${auth.baseUrl}${cleanPermalink}.json?raw_json=1&limit=${clampedLimit}&depth=${clampedDepth}&sort=${encodeURIComponent(sort)}`,
     method: "GET",
     headers: { ...auth.headers },
   };
@@ -102,7 +105,7 @@ export function buildCommentContextRequest(
   const cleanPermalink = commentPermalink.replace(/\/+$/, "");
   const depth = Math.max(1, Math.min(10, contextDepth));
   return {
-    url: `${auth.baseUrl}${cleanPermalink}.json?context=${depth}`,
+    url: `${auth.baseUrl}${cleanPermalink}.json?raw_json=1&context=${depth}`,
     method: "GET",
     headers: { ...auth.headers },
   };
@@ -116,7 +119,7 @@ export function buildCommentThreadRequest(
   sort = "best",
 ): RequestParams {
   return {
-    url: `${auth.baseUrl}/r/${encodeURIComponent(subreddit)}/comments/${encodeURIComponent(postId)}.json?sort=${encodeURIComponent(sort)}&limit=${COMMENT_MAX_TOP_LEVEL}&depth=${COMMENT_MAX_DEPTH}`,
+    url: `${auth.baseUrl}/r/${encodeURIComponent(subreddit)}/comments/${encodeURIComponent(postId)}.json?raw_json=1&sort=${encodeURIComponent(sort)}&limit=${COMMENT_MAX_TOP_LEVEL}&depth=${COMMENT_MAX_DEPTH}`,
     method: "GET",
     headers: { ...auth.headers },
   };

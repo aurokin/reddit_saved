@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { closeAppContext, getAppContext } from "@/api/context";
 import syncRoute from "@/api/routes/sync";
 import {
-  getCheckpointPathForDatabase,
-  RedditApiClient,
-  SyncStateManager,
   type AuthProvider,
   type FetchOptions,
+  RedditApiClient,
   type RedditItem,
+  SyncStateManager,
+  getCheckpointPathForDatabase,
 } from "@reddit-saved/core";
 
 function makeItem(id: string): RedditItem {
@@ -33,10 +33,17 @@ describe("sync route checkpoint recovery", () => {
   let tempDir: string;
   let ctx: ReturnType<typeof getAppContext>;
   let originalFetchSaved: typeof RedditApiClient.prototype.fetchSaved;
-  let originalCreatePinnedProvider: ReturnType<typeof getAppContext>["authProvider"]["createPinnedProvider"];
+  let originalCreatePinnedProvider: ReturnType<
+    typeof getAppContext
+  >["authProvider"]["createPinnedProvider"];
   const fakeProvider: AuthProvider = {
     ensureValid: async () => {},
-    getAuthContext: () => ({ headers: {}, baseUrl: "http://localhost", pathSuffix: "", username: "tester" }),
+    getAuthContext: () => ({
+      headers: {},
+      baseUrl: "http://localhost",
+      pathSuffix: "",
+      username: "tester",
+    }),
     isAuthenticated: () => true,
   };
 
@@ -74,7 +81,7 @@ describe("sync route checkpoint recovery", () => {
     await stateManager.save(checkpoint);
 
     let receivedStartCursor: string | undefined;
-    RedditApiClient.prototype.fetchSaved = async function (options?: FetchOptions) {
+    RedditApiClient.prototype.fetchSaved = async (options?: FetchOptions) => {
       receivedStartCursor = options?.startCursor;
       return { items: [], cursor: null, hasMore: false, wasCancelled: false };
     };
@@ -92,15 +99,13 @@ describe("sync route checkpoint recovery", () => {
   test("preserves the updated checkpoint after an incomplete incremental sync", async () => {
     const stateManager = new SyncStateManager(getCheckpointPathForDatabase(ctx.dbPath));
 
-    RedditApiClient.prototype.fetchSaved = async function () {
-      return {
-        items: [makeItem("partial1")],
-        cursor: "resume_after_page1",
-        hasMore: true,
-        wasCancelled: false,
-        wasErrored: true,
-      };
-    };
+    RedditApiClient.prototype.fetchSaved = async () => ({
+      items: [makeItem("partial1")],
+      cursor: "resume_after_page1",
+      hasMore: true,
+      wasCancelled: false,
+      wasErrored: true,
+    });
 
     const res = await syncRoute.fetch(
       new Request("http://localhost/fetch?type=saved&full=false", { method: "GET" }),
@@ -113,6 +118,39 @@ describe("sync route checkpoint recovery", () => {
     expect(checkpoint?.cursor).toBe("resume_after_page1");
     expect(checkpoint?.totalFetched).toBe(1);
     expect(ctx.storage.getSyncState("last_cursor_saved")).toBe("resume_after_page1");
+  });
+
+  test("resumed full sync does not orphan items stored by the interrupted run", async () => {
+    // Simulate a genuinely stale item from a much older sync.
+    ctx.storage.upsertPosts([makeItem("stale")], "saved");
+    ctx.storage.getDb().run("UPDATE posts SET last_seen_at = 1000 WHERE id = 'stale'");
+
+    // Run 1: checkpoint created, one page stored, then interrupted.
+    const stateManager = new SyncStateManager(getCheckpointPathForDatabase(ctx.dbPath));
+    const checkpoint = stateManager.createNew(undefined, { contentOrigin: "saved", isFull: true });
+    checkpoint.cursor = "resume_cursor";
+    await stateManager.save(checkpoint);
+    ctx.storage.upsertPosts([makeItem("run1")], "saved");
+
+    // Run 2: resumes from the checkpoint and fetches only the remaining page.
+    RedditApiClient.prototype.fetchSaved = async () => ({
+      items: [makeItem("run2")],
+      cursor: null,
+      hasMore: false,
+      wasCancelled: false,
+    });
+
+    const res = await syncRoute.fetch(
+      new Request("http://localhost/fetch?type=saved&full=true", { method: "GET" }),
+    );
+    expect(res.status).toBe(200);
+    await res.text();
+
+    // The orphan threshold must be the checkpoint's original start time: items
+    // stored by the interrupted run survive, genuinely stale items do not.
+    expect(ctx.storage.getPost("run1")?.is_on_reddit).toBe(1);
+    expect(ctx.storage.getPost("run2")?.is_on_reddit).toBe(1);
+    expect(ctx.storage.getPost("stale")?.is_on_reddit).toBe(0);
   });
 
   test("does not reuse a checkpoint from a different database", async () => {
@@ -132,7 +170,7 @@ describe("sync route checkpoint recovery", () => {
     bootApp(secondDbPath);
 
     let receivedStartCursor: string | undefined;
-    RedditApiClient.prototype.fetchSaved = async function (options?: FetchOptions) {
+    RedditApiClient.prototype.fetchSaved = async (options?: FetchOptions) => {
       receivedStartCursor = options?.startCursor;
       return { items: [], cursor: null, hasMore: false, wasCancelled: false };
     };

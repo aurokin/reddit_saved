@@ -12,9 +12,22 @@ import { paths } from "../utils/paths";
 type SessionValidationErrorCode = "SESSION_INVALID";
 const SESSION_VERIFY_CACHE_MS = 60_000;
 
-function makeSessionValidationError(message: string, code: SessionValidationErrorCode): Error {
-  const error = new Error(message) as Error & { code?: SessionValidationErrorCode };
+type SessionValidationError = Error & {
+  code?: SessionValidationErrorCode;
+  /** True when Reddit affirmatively reported the session as logged out (HTTP 200
+   *  with an anonymous body). HTTP 401/403 from www.reddit.com is left false —
+   *  it is frequently transient anti-bot filtering, not proof the session died. */
+  confirmedLoggedOut?: boolean;
+};
+
+function makeSessionValidationError(
+  message: string,
+  code: SessionValidationErrorCode,
+  confirmedLoggedOut = false,
+): SessionValidationError {
+  const error = new Error(message) as SessionValidationError;
   error.code = code;
+  error.confirmedLoggedOut = confirmedLoggedOut;
   return error;
 }
 
@@ -161,6 +174,7 @@ export class SessionManager implements AuthProvider {
       throw makeSessionValidationError(
         "Session is no longer authenticated to reddit.com",
         "SESSION_INVALID",
+        true,
       );
     }
     return {
@@ -273,7 +287,11 @@ export class SessionManager implements AuthProvider {
       });
       await this.verificationPromise;
     } catch (err) {
-      if ((err as Error & { code?: string }).code === "SESSION_INVALID") {
+      // Only destroy the persisted session when Reddit affirmatively reported
+      // it logged out. A lone 401/403 can be transient anti-bot filtering —
+      // deleting session.json for it would force a pointless extension
+      // reconnect (or strand CLI users who have no extension running).
+      if ((err as SessionValidationError).confirmedLoggedOut) {
         await this.clear();
       } else {
         this.verifiedAt = null;

@@ -3,8 +3,8 @@
  */
 import {
   type ApiClientCallbacks,
-  type ContentOrigin,
   type CheckpointData,
+  type ContentOrigin,
   type FetchResult,
   type OrphanDetectionResult,
   RedditApiClient,
@@ -85,7 +85,10 @@ app.get("/fetch", (c) => {
 
   const controller = new AbortController();
   const abortSync = (): void => {
-    controller.abort("sync client disconnected");
+    // Abort with a real AbortError — a string reason would flow out of fetch()
+    // as a nameless rejection, which the request queue would misread as a
+    // retryable network fault and count against the circuit breaker.
+    controller.abort(new DOMException("sync client disconnected", "AbortError"));
   };
   ctx.activeSync = controller;
 
@@ -102,7 +105,7 @@ app.get("/fetch", (c) => {
     try {
       const stateManager = new SyncStateManager(getCheckpointPathForDatabase(ctx.dbPath));
       const loadedCheckpoint = await stateManager.load();
-      let checkpoint =
+      const checkpoint =
         loadedCheckpoint && isCheckpointCompatible(loadedCheckpoint, origin, isFull)
           ? loadedCheckpoint
           : stateManager.createNew(undefined, {
@@ -188,7 +191,11 @@ app.get("/fetch", (c) => {
           checkpoint.phase = "cleanup";
           await stateManager.save(checkpoint);
           await send("progress", { phase: "cleanup" });
-          orphan = detectOrphans(ctx.storage, syncStart, [origin]);
+          // Threshold must be the checkpoint's original start, not this run's:
+          // a resumed full sync only refetches items after the saved cursor, so
+          // items stored by the interrupted earlier run carry an older
+          // last_seen_at and would be falsely orphaned by the current clock.
+          orphan = detectOrphans(ctx.storage, checkpoint.startedAt, [origin]);
         }
         await send("complete", {
           fetched: result.items.length,
@@ -248,9 +255,7 @@ unsaveHandler.post("/", async (c) => {
   const postIdByFullname = new Map(rows.map((r) => [r.name, r.id]));
 
   const result = await ctx.apiClient.unsaveItems(fullnames);
-  const succeededIds = rows
-    .filter((r) => result.succeeded.includes(r.name))
-    .map((r) => r.id);
+  const succeededIds = rows.filter((r) => result.succeeded.includes(r.name)).map((r) => r.id);
   if (succeededIds.length > 0) ctx.storage.markUnsaved(succeededIds);
 
   return c.json({

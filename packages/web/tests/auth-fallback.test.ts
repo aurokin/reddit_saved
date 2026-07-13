@@ -97,7 +97,8 @@ describe("session auth fallback", () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (url === `${REDDIT_BASE_URL}/api/me.json`) {
-        return new Response("unauthorized", { status: 401 });
+        // Affirmative logged-out signal — Reddit answers 200 with an anonymous body.
+        return Response.json({});
       }
       if (url === `${REDDIT_OAUTH_BASE_URL}/api/v1/me`) {
         expect(new Headers(init?.headers).get("authorization")).toBe("Bearer oauth-access");
@@ -118,7 +119,8 @@ describe("session auth fallback", () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (url === `${REDDIT_BASE_URL}/api/me.json`) {
-        return new Response("unauthorized", { status: 401 });
+        // Affirmative logged-out signal — Reddit answers 200 with an anonymous body.
+        return Response.json({});
       }
       throw new Error(`Unexpected fetch: ${url}`);
     }) as unknown as typeof fetch;
@@ -139,7 +141,8 @@ describe("session auth fallback", () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (url === `${REDDIT_BASE_URL}/api/me.json`) {
-        return new Response("unauthorized", { status: 401 });
+        // Affirmative logged-out signal — Reddit answers 200 with an anonymous body.
+        return Response.json({});
       }
       throw new Error(`Unexpected fetch: ${url}`);
     }) as unknown as typeof fetch;
@@ -147,7 +150,7 @@ describe("session auth fallback", () => {
     const ctx = getAppContext();
 
     await expect(ctx.apiClient.fetchUsername()).rejects.toThrow(
-      "Session verification failed: HTTP 401",
+      "Session is no longer authenticated to reddit.com",
     );
     expect(await Bun.file(paths.sessionFile).exists()).toBe(false);
     expect(await Bun.file(paths.authFile).exists()).toBe(true);
@@ -157,7 +160,8 @@ describe("session auth fallback", () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (url === `${REDDIT_BASE_URL}/api/me.json`) {
-        return new Response("unauthorized", { status: 401 });
+        // Affirmative logged-out signal — Reddit answers 200 with an anonymous body.
+        return Response.json({});
       }
       throw new Error(`Unexpected fetch: ${url}`);
     }) as unknown as typeof fetch;
@@ -169,7 +173,7 @@ describe("session auth fallback", () => {
       authenticated: false,
       username: null,
       mode: null,
-      error: "Session verification failed: HTTP 401",
+      error: "Session is no longer authenticated to reddit.com",
       testMode: false,
     });
     expect(await Bun.file(paths.sessionFile).exists()).toBe(false);
@@ -291,7 +295,7 @@ describe("session auth fallback", () => {
         }
         return Response.json({ kind: "t2", data: { name: "session-user" } });
       }
-      if (url === `${REDDIT_OAUTH_BASE_URL}/user/session-user/saved?limit=100`) {
+      if (url === `${REDDIT_OAUTH_BASE_URL}/user/session-user/saved?raw_json=1&limit=100`) {
         expect(new Headers(init?.headers).get("authorization")).toBe("Bearer oauth-access");
         return Response.json({
           kind: "Listing",
@@ -302,7 +306,8 @@ describe("session auth fallback", () => {
         });
       }
       if (
-        url === `${REDDIT_OAUTH_BASE_URL}/user/session-user/saved?limit=100&after=cursor_oauth_1`
+        url ===
+        `${REDDIT_OAUTH_BASE_URL}/user/session-user/saved?raw_json=1&limit=100&after=cursor_oauth_1`
       ) {
         expect(new Headers(init?.headers).get("authorization")).toBe("Bearer oauth-access");
         return Response.json({
@@ -358,7 +363,7 @@ describe("session auth fallback", () => {
         return new Response("unavailable", { status: 503 });
       }
 
-      if (url === `${REDDIT_BASE_URL}/user/session-user/saved.json?limit=100`) {
+      if (url === `${REDDIT_BASE_URL}/user/session-user/saved.json?raw_json=1&limit=100`) {
         now = 62_000;
         return Response.json({
           kind: "Listing",
@@ -370,7 +375,8 @@ describe("session auth fallback", () => {
       }
 
       if (
-        url === `${REDDIT_OAUTH_BASE_URL}/user/session-user/saved?limit=100&after=cursor_session_1`
+        url ===
+        `${REDDIT_OAUTH_BASE_URL}/user/session-user/saved?raw_json=1&limit=100&after=cursor_session_1`
       ) {
         expect(new Headers(init?.headers).get("authorization")).toBe("Bearer oauth-access");
         return Response.json({
@@ -428,7 +434,8 @@ describe("session auth fallback", () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (url === `${REDDIT_BASE_URL}/api/me.json`) {
-        return new Response("unauthorized", { status: 401 });
+        // Affirmative logged-out signal — Reddit answers 200 with an anonymous body.
+        return Response.json({});
       }
       throw new Error(`Unexpected fetch: ${url}`);
     }) as unknown as typeof fetch;
@@ -706,7 +713,8 @@ describe("session auth fallback", () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (url === `${REDDIT_BASE_URL}/api/me.json`) {
-        return new Response("unauthorized", { status: 401 });
+        // Affirmative logged-out signal — Reddit answers 200 with an anonymous body.
+        return Response.json({});
       }
       throw new Error(`Unexpected fetch: ${url}`);
     }) as unknown as typeof fetch;
@@ -739,7 +747,7 @@ describe("session auth fallback", () => {
     expect(await res.json()).toEqual({
       ok: false,
       code: "SESSION_INVALID",
-      message: "Session verification failed: HTTP 401",
+      message: "Session is no longer authenticated to reddit.com",
     });
   });
 

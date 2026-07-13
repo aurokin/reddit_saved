@@ -13,6 +13,7 @@ import {
 } from "@reddit-saved/core";
 
 let tempDir: string | null = null;
+const originalConfigDir = process.env.REDDIT_SAVED_CONFIG_DIR;
 
 function makeSyncRequest(
   path: string,
@@ -49,12 +50,21 @@ describe("sync route", () => {
     tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-web-sync-"));
     process.env.TEST_MODE = "1";
     process.env.REDDIT_SAVED_DB = join(tempDir, "test.db");
+    // Isolate auth files too — without this, tests that unset TEST_MODE would
+    // pick up a real session.json from the developer's machine and run a live
+    // sync against reddit.com.
+    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "config");
   });
 
   afterEach(() => {
     closeAppContext();
     process.env.TEST_MODE = undefined;
     process.env.REDDIT_SAVED_DB = undefined;
+    if (originalConfigDir === undefined) {
+      Reflect.deleteProperty(process.env, "REDDIT_SAVED_CONFIG_DIR");
+    } else {
+      process.env.REDDIT_SAVED_CONFIG_DIR = originalConfigDir;
+    }
     if (tempDir) {
       rmSync(tempDir, { recursive: true, force: true });
       tempDir = null;

@@ -47,7 +47,7 @@ describe("buildUserAgent", () => {
 describe("buildContentPageRequest", () => {
   test("builds correct URL without cursor", () => {
     const params = buildContentPageRequest(bearerAuth(), "saved", 100);
-    expect(params.url).toBe(`${REDDIT_OAUTH_BASE_URL}/user/user1/saved?limit=100`);
+    expect(params.url).toBe(`${REDDIT_OAUTH_BASE_URL}/user/user1/saved?raw_json=1&limit=100`);
     expect(params.method).toBe("GET");
     expect(params.headers?.Authorization).toBe("Bearer tok");
     expect(params.headers?.["User-Agent"]).toBe("ua");
@@ -65,7 +65,7 @@ describe("buildContentPageRequest", () => {
 
   test("appends pathSuffix from auth context (cookie mode appends .json)", () => {
     const params = buildContentPageRequest(cookieAuth(), "saved", 100);
-    expect(params.url).toBe("https://www.reddit.com/user/user1/saved.json?limit=100");
+    expect(params.url).toBe("https://www.reddit.com/user/user1/saved.json?raw_json=1&limit=100");
     expect(params.headers?.Cookie).toBe("reddit_session=abc");
     expect(params.headers?.Authorization).toBeUndefined();
   });

@@ -207,7 +207,11 @@ export async function fetchCmd(
     if (isFull) {
       checkpoint.phase = "cleanup";
       await stateManager.save(checkpoint);
-      orphanResult = detectOrphans(ctx.storage, syncStartTime, [contentOrigin]);
+      // Threshold must be the checkpoint's original start, not this run's:
+      // a resumed full sync only refetches items after the saved cursor, so
+      // items stored by the interrupted earlier run carry an older
+      // last_seen_at and would be falsely orphaned by the current clock.
+      orphanResult = detectOrphans(ctx.storage, checkpoint.startedAt, [contentOrigin]);
       if (orphanResult.reason) {
         printWarning(orphanResult.reason);
       }

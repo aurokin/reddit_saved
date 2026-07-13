@@ -41,7 +41,25 @@ describe("SessionManager", () => {
     }
   });
 
-  test("clears stale sessions when reddit rejects the saved cookies", async () => {
+  test("clears stale sessions when reddit reports them logged out", async () => {
+    // Affirmative logged-out signal: HTTP 200 with an anonymous body.
+    globalThis.fetch = mock(async () => Response.json({})) as typeof fetch;
+
+    let thrown: unknown;
+    try {
+      await manager.ensureValid();
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect((thrown as Error & { code?: string })?.code).toBe("SESSION_INVALID");
+    expect(manager.isAuthenticated()).toBe(false);
+    expect(await Bun.file(paths.sessionFile).exists()).toBe(false);
+  });
+
+  test("preserves the session when reddit rejects the probe with 401/403", async () => {
+    // 401/403 from www.reddit.com is frequently transient anti-bot filtering,
+    // not proof the session died — the persisted session must survive it.
     globalThis.fetch = mock(
       async () => new Response("unauthorized", { status: 401 }),
     ) as typeof fetch;
@@ -54,8 +72,8 @@ describe("SessionManager", () => {
     }
 
     expect((thrown as Error & { code?: string })?.code).toBe("SESSION_INVALID");
-    expect(manager.isAuthenticated()).toBe(false);
-    expect(await Bun.file(paths.sessionFile).exists()).toBe(false);
+    expect(manager.isAuthenticated()).toBe(true);
+    expect(await Bun.file(paths.sessionFile).exists()).toBe(true);
   });
 
   test("preserves the session on transient verification failures", async () => {
