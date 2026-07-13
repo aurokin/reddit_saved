@@ -22,6 +22,9 @@ reddit-saved tag list|create|rename|delete|add|remove|show
 reddit-saved links top [--window 90d] [--exclude-reddit] [--limit N]
 reddit-saved links search <pattern> [--limit N]
 reddit-saved links rebuild
+reddit-saved backup init --repo <path> [--remote <name>] [--push]
+reddit-saved backup sync [--push] [--no-git]
+reddit-saved backup status
 ```
 
 ## Notes
@@ -50,6 +53,12 @@ reddit-saved links rebuild
   params). It is maintained automatically during fetches; `links rebuild`
   regenerates it from the posts table. `--window` accepts `90d`, `12w`, `6m`,
   `1y`.
+- `backup` writes deterministic JSONL (posts sharded by UTC year, plus tags,
+  post_tags, and sync_state; derived tables excluded) into a git repository
+  configured in `<configDir>/config.json`. Output is byte-identical for the
+  same database state, so an unchanged sync produces no commit. Commits are
+  made with GPG signing disabled; `--push` (or `push: true` in config) pushes
+  to the configured remote.
 - Each fetch writes a per-origin resume checkpoint
   (`.reddit-import-checkpoint.<origin>.json` next to the database) and records
   provenance in the `sync_runs` table; `status` reports the latest run per

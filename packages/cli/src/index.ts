@@ -15,6 +15,7 @@ import { authLogin } from "./auth/login";
 import { authLogout } from "./auth/logout";
 import { authStatus } from "./auth/status";
 
+import { backupInitCmd, backupStatusCmd, backupSyncCmd } from "./commands/backup";
 import { exportCmd } from "./commands/export";
 // Data commands
 import { fetchCmd } from "./commands/fetch";
@@ -62,6 +63,9 @@ const COMMANDS: Record<string, CommandHandler> = {
   "links top": linksTopCmd,
   "links search": linksSearchCmd,
   "links rebuild": linksRebuildCmd,
+  "backup init": backupInitCmd,
+  "backup sync": backupSyncCmd,
+  "backup status": backupStatusCmd,
 };
 
 const USAGE = `reddit-saved v${VERSION} — Manage your Reddit saved posts locally
@@ -97,6 +101,12 @@ Commands:
                           --window 90d|6m|1y, --exclude-reddit, --limit N
   links search <pattern>  Find posts referencing a URL substring
   links rebuild           Rebuild the derived link index from posts
+
+  backup init             Configure a git-backed JSONL backup repository
+                          --repo <path> [--remote <name>] [--push]
+  backup sync             Write the backup and commit (deterministic JSONL)
+                          [--push] [--no-git]
+  backup status           Compare the database against the last backup
 
 List/search/export options:
   --hide-low-quality      Exclude deleted/removed content, bot posts, and

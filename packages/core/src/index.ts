@@ -184,6 +184,32 @@ export {
   buildCommentThreadRequest,
 } from "./api/endpoints";
 
+// Backup
+export {
+  buildBackupPlan,
+  buildManifest,
+  canonicalStringify,
+  readManifest,
+  writeBackup,
+  backupStatus,
+} from "./backup/backup";
+export type {
+  BackupFileEntry,
+  BackupManifest,
+  BackupPlanFile,
+  BackupStatus,
+  BackupWriteResult,
+} from "./backup/backup";
+export {
+  commitBackup,
+  ensureGitRepo,
+  hasRemote,
+  isGitRepo,
+  runGit,
+  writeRepoScaffolding,
+} from "./backup/git";
+export type { BackupCommitOptions, BackupCommitResult, GitResult } from "./backup/git";
+
 // Links
 export { extractUrls, canonicalizeUrl, isRedditHost } from "./links/url-extract";
 export type { CanonicalUrl } from "./links/url-extract";
@@ -219,5 +245,7 @@ export { PerformanceMonitor, formatDuration, formatBytes } from "./monitor/perfo
 
 // Utilities
 export { getCheckpointPathForDatabase, paths } from "./utils/paths";
+export { getConfigFilePath, loadConfig, saveConfig } from "./utils/config";
+export type { AppConfig, BackupConfig } from "./utils/config";
 export { decodeHtmlEntities, escapeHtml } from "./utils/html-escape";
 export { sanitizeFilename } from "./utils/file-sanitizer";

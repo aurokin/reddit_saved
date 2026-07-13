@@ -34,6 +34,7 @@ const COMMAND_WORDS = new Set([
   "unsave",
   "tag",
   "links",
+  "backup",
   "create",
   "rename",
   "delete",
@@ -49,6 +50,7 @@ const SUBCOMMANDS: Record<string, Set<string>> = {
   tag: new Set(["list", "create", "rename", "delete", "add", "remove", "show"]),
   fetch: new Set(["context"]),
   links: new Set(["top", "search", "rebuild"]),
+  backup: new Set(["init", "sync", "status"]),
 };
 
 /** Flags that are always boolean — never consume the next argument as a value */
@@ -68,6 +70,8 @@ const BOOLEAN_FLAGS = new Set([
   "all",
   "include-context",
   "exclude-reddit",
+  "push",
+  "no-git",
 ]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
