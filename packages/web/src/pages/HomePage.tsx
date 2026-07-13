@@ -1,11 +1,11 @@
-import { Link } from "@tanstack/react-router";
-import { Archive, TagIcon } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { PostCard } from "@/components/PostCard";
-import { Skeleton } from "@/components/ui/skeleton";
 import { SyncStatus } from "@/components/SyncStatus";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStatus, usePosts, useSyncStatus, useTags } from "@/hooks/queries";
+import { Link } from "@tanstack/react-router";
+import { Archive, TagIcon } from "lucide-react";
 
 export function HomePage() {
   const auth = useAuthStatus();
@@ -44,14 +44,8 @@ export function HomePage() {
               : undefined
           }
         />
-        <StatCard
-          label="Subreddits"
-          value={stats ? String(stats.subredditCounts.length) : "—"}
-        />
-        <StatCard
-          label="Tags"
-          value={tags.data ? String(tags.data.items.length) : "—"}
-        />
+        <StatCard label="Subreddits" value={stats ? String(stats.subredditCounts.length) : "—"} />
+        <StatCard label="Tags" value={tags.data ? String(tags.data.items.length) : "—"} />
       </section>
 
       <section>

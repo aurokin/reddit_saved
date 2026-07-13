@@ -1,10 +1,7 @@
 import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import {
-  SEARCH_SNIPPET_HIGHLIGHT_END,
-  SEARCH_SNIPPET_HIGHLIGHT_START,
-} from "../constants";
+import { SEARCH_SNIPPET_HIGHLIGHT_END, SEARCH_SNIPPET_HIGHLIGHT_START } from "../constants";
 import type {
   ContentOrigin,
   DbStats,

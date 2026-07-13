@@ -6,7 +6,15 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "a11y": {
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": {
+            "inputComponents": ["Input"]
+          }
+        }
+      }
     }
   },
   "formatter": {
@@ -16,6 +24,28 @@
     "lineWidth": 100
   },
   "files": {
-    "ignore": ["node_modules", "dist", "reference"]
-  }
+    "ignore": ["node_modules", "dist", "reference", "test-results"]
+  },
+  "overrides": [
+    {
+      "include": ["packages/web/src/components/ui/**"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "useFocusableInteractive": "off"
+          }
+        }
+      }
+    },
+    {
+      "include": ["**/tests/**", "**/*.test.*"],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noDelete": "off"
+          }
+        }
+      }
+    }
+  ]
 }

@@ -1,3 +1,4 @@
+import { SyncStreamProvider } from "@/hooks/queries";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   RouterProvider,
@@ -6,8 +7,7 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router";
-import { render, type RenderResult } from "@testing-library/react";
-import { SyncStreamProvider } from "@/hooks/queries";
+import { type RenderResult, render } from "@testing-library/react";
 import { type ReactElement, type ReactNode, act } from "react";
 
 function makeClient(): QueryClient {

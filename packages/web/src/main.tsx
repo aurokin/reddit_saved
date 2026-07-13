@@ -4,8 +4,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { router } from "./router";
 import "./styles/globals.css";
-import { queryClient } from "./lib/query-client";
 import { SyncStreamProvider } from "./hooks/queries";
+import { queryClient } from "./lib/query-client";
 
 declare module "@tanstack/react-router" {
   interface Register {

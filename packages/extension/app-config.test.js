@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  DEFAULT_APP_BASE_URL,
-  candidateBaseUrls,
-  normalizeAppBaseUrl,
-} from "./app-config.js";
+import { DEFAULT_APP_BASE_URL, candidateBaseUrls, normalizeAppBaseUrl } from "./app-config.js";
 
 describe("app config helpers", () => {
   test("falls back to the default app URL when unset", () => {

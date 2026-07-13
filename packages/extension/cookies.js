@@ -38,7 +38,7 @@ export function pickPrimaryStoreId(storeIds) {
   if (uniqueStoreIds.length <= 1) return uniqueStoreIds[0] ?? null;
 
   let bestStoreId = uniqueStoreIds[0];
-  let bestRank = Infinity;
+  let bestRank = Number.POSITIVE_INFINITY;
 
   for (const storeId of uniqueStoreIds) {
     const normalized = storeId.toLowerCase();

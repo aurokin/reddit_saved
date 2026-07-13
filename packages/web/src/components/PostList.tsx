@@ -1,7 +1,7 @@
+import type { PostRow, SearchResult } from "@/types";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useRef } from "react";
 import { PostCard } from "./PostCard";
-import type { PostRow, SearchResult } from "@/types";
 
 export function PostList({
   items,
@@ -27,10 +27,7 @@ export function PostList({
       className="relative max-h-[calc(100vh-12rem)] w-full overflow-auto pr-1"
       data-testid="post-list"
     >
-      <div
-        className="relative w-full"
-        style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
-      >
+      <div className="relative w-full" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
         {rowVirtualizer.getVirtualItems().map((v) => {
           const item = items[v.index];
           if (!item) return null;

@@ -1,9 +1,9 @@
 import "./setup";
 import { describe, expect, mock, test } from "bun:test";
-import { fireEvent, screen } from "@testing-library/react";
-import { useState } from "react";
 import { FilterPanel } from "@/components/FilterPanel";
 import type { BrowseFilters } from "@/types";
+import { fireEvent, screen } from "@testing-library/react";
+import { useState } from "react";
 import { renderWithClient as renderWithProviders } from "./render";
 
 function Host({ initial = {} }: { initial?: BrowseFilters }) {

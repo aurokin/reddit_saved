@@ -1,11 +1,11 @@
-import { Link } from "@tanstack/react-router";
-import { ExternalLink, MessageSquare, ThumbsUp } from "lucide-react";
+import { formatNumber, formatRelative, parseTags } from "@/lib/utils";
+import type { PostRow, SearchResult } from "@/types";
 import {
   SEARCH_SNIPPET_HIGHLIGHT_END,
   SEARCH_SNIPPET_HIGHLIGHT_START,
 } from "@reddit-saved/core/search-snippet";
-import type { PostRow, SearchResult } from "@/types";
-import { formatNumber, formatRelative, parseTags } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
+import { ExternalLink, MessageSquare, ThumbsUp } from "lucide-react";
 import { TagChips } from "./TagChips";
 import { Badge } from "./ui/badge";
 
@@ -20,12 +20,11 @@ export function PostCard({ post, snippet, onClick, compact }: PostCardProps) {
   const tags = parseTags(post.tags);
   const isComment = post.kind === "t1";
   const isOrphaned = post.is_on_reddit === 0;
-  const title = isComment
-    ? post.link_title ?? "(comment)"
-    : post.title ?? "(untitled)";
+  const title = isComment ? (post.link_title ?? "(comment)") : (post.title ?? "(untitled)");
   const displayText = isComment ? post.body : post.selftext;
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: card click is a pointer convenience; the title Link inside provides the keyboard path
     <article
       onClick={onClick}
       className="group flex flex-col gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 transition-colors hover:border-[var(--color-ring)]"
@@ -41,11 +40,7 @@ export function PostCard({ post, snippet, onClick, compact }: PostCardProps) {
           r/{post.subreddit}
         </Link>
         <span>·</span>
-        <Link
-          to="/browse"
-          search={{ author: post.author }}
-          className="hover:underline"
-        >
+        <Link to="/browse" search={{ author: post.author }} className="hover:underline">
           u/{post.author}
         </Link>
         <span>·</span>
@@ -82,6 +77,7 @@ export function PostCard({ post, snippet, onClick, compact }: PostCardProps) {
           className="fts-snippet line-clamp-3 text-sm text-[var(--color-muted-foreground)]"
           // Snippet arrives with placeholder highlight markers from FTS. Escape the
           // full payload, then restore only those markers as <b> tags.
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitizeSnippet escapes all HTML before restoring the <b> markers
           dangerouslySetInnerHTML={{ __html: sanitizeSnippet(snippet) }}
         />
       ) : !compact && displayText ? (

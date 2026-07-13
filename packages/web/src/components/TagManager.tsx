@@ -1,11 +1,6 @@
+import { useCreateTag, useDeleteTag, useRenameTag, useTags } from "@/hooks/queries";
 import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
-import {
-  useCreateTag,
-  useDeleteTag,
-  useRenameTag,
-  useTags,
-} from "@/hooks/queries";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -107,12 +102,7 @@ export function TagManager() {
                 <Button type="submit" size="sm">
                   Save
                 </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setRenaming(null)}
-                >
+                <Button type="button" variant="ghost" size="sm" onClick={() => setRenaming(null)}>
                   Cancel
                 </Button>
               </form>

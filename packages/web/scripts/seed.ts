@@ -310,14 +310,18 @@ function main(): void {
             title,
             author,
             subreddit,
-            permalink: `/r/${subreddit}/comments/${id}/${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}/`,
+            permalink: `/r/${subreddit}/comments/${id}/${title
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .slice(0, 40)}/`,
             created_utc: created,
             score,
             selftext: `${pick(BODIES)}\n\n${pick(BODIES)}`,
             is_self: true,
             num_comments: Math.floor(rng() * 600),
             upvote_ratio: 0.7 + rng() * 0.29,
-            link_flair_text: rng() < 0.3 ? pick(["Discussion", "Help", "Question", "Show"]) : undefined,
+            link_flair_text:
+              rng() < 0.3 ? pick(["Discussion", "Help", "Question", "Show"]) : undefined,
             over_18: rng() < 0.05,
           },
         };

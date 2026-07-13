@@ -1,7 +1,7 @@
 import "./setup";
 import { describe, expect, test } from "bun:test";
-import { screen } from "@testing-library/react";
 import { EmptyState } from "@/components/EmptyState";
+import { screen } from "@testing-library/react";
 import { renderWithClient as renderWithProviders } from "./render";
 
 describe("EmptyState", () => {

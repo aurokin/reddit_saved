@@ -1,15 +1,19 @@
 import "./setup";
 import { describe, expect, mock, test } from "bun:test";
-import { screen } from "@testing-library/react";
 import {
   SEARCH_SNIPPET_HIGHLIGHT_END,
   SEARCH_SNIPPET_HIGHLIGHT_START,
 } from "@reddit-saved/core/search-snippet";
+import { screen } from "@testing-library/react";
 
 // Stub @tanstack/react-router Link to a plain anchor so PostCard doesn't
 // need a full RouterProvider just to render.
 mock.module("@tanstack/react-router", () => ({
-  Link: ({ children, to, ...props }: { children: React.ReactNode; to?: string; [k: string]: unknown }) => (
+  Link: ({
+    children,
+    to,
+    ...props
+  }: { children: React.ReactNode; to?: string; [k: string]: unknown }) => (
     <a href={typeof to === "string" ? to : "#"} {...(props as object)}>
       {children}
     </a>

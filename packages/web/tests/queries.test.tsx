@@ -58,7 +58,13 @@ function RenameTagHarness() {
   const { mutateAsync, status } = useRenameTag();
 
   useEffect(() => {
-    if (tags.isSuccess && list.isSuccess && search.isSuccess && post.isSuccess && status === "idle") {
+    if (
+      tags.isSuccess &&
+      list.isSuccess &&
+      search.isSuccess &&
+      post.isSuccess &&
+      status === "idle"
+    ) {
       void mutateAsync({ oldName: "favorite", newName: "favorites" });
     }
   }, [list.isSuccess, mutateAsync, post.isSuccess, search.isSuccess, status, tags.isSuccess]);
@@ -74,7 +80,13 @@ function DeleteTagHarness() {
   const { mutateAsync, status } = useDeleteTag();
 
   useEffect(() => {
-    if (tags.isSuccess && list.isSuccess && search.isSuccess && post.isSuccess && status === "idle") {
+    if (
+      tags.isSuccess &&
+      list.isSuccess &&
+      search.isSuccess &&
+      post.isSuccess &&
+      status === "idle"
+    ) {
       void mutateAsync("favorite");
     }
   }, [list.isSuccess, mutateAsync, post.isSuccess, search.isSuccess, status, tags.isSuccess]);

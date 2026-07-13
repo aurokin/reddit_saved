@@ -1,5 +1,9 @@
 import "./setup";
 import { afterEach, describe, expect, mock, test } from "bun:test";
+import { SyncStatus } from "@/components/SyncStatus";
+import { SyncStreamProvider, usePost, usePosts, useSearchPosts } from "@/hooks/queries";
+import { RootLayout } from "@/pages/RootLayout";
+import type { BrowseFilters } from "@/types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -12,10 +16,6 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { SyncStreamProvider, usePost, usePosts, useSearchPosts } from "@/hooks/queries";
-import { SyncStatus } from "@/components/SyncStatus";
-import { RootLayout } from "@/pages/RootLayout";
-import type { BrowseFilters } from "@/types";
 
 const originalFetch = globalThis.fetch;
 const originalEventSource = globalThis.EventSource;
@@ -46,7 +46,6 @@ function BrowseSearchState() {
   return <pre data-testid="browse-search">{JSON.stringify(search)}</pre>;
 }
 
-
 function makeSyncStatus() {
   return {
     isRunning: false,
@@ -73,7 +72,9 @@ function SyncPage() {
   return (
     <div>
       <SyncStatus />
-      <button onClick={() => void navigate({ to: "/settings" })}>Go to settings</button>
+      <button type="button" onClick={() => void navigate({ to: "/settings" })}>
+        Go to settings
+      </button>
     </div>
   );
 }
@@ -153,7 +154,7 @@ class MockEventSource {
     listeners.push(
       typeof listener === "function"
         ? (listener as (event: MessageEvent) => void)
-        : ((event: MessageEvent) => listener.handleEvent(event)),
+        : (event: MessageEvent) => listener.handleEvent(event),
     );
     this.listeners.set(type, listeners);
   }
@@ -210,7 +211,8 @@ describe("RootLayout header search", () => {
 
   test("clearing a browse query removes q while preserving other browse filters", async () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
-      const rawUrl = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const rawUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       const url = new URL(rawUrl, "http://localhost");
       if (url.pathname === "/api/sync/status") {
         return Response.json({
@@ -250,12 +252,12 @@ describe("RootLayout header search", () => {
     });
   });
 
-
   test("keeps the sync stream alive when the page-level status unmounts", async () => {
     let cancelCalls = 0;
 
     globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const rawUrl = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const rawUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       const url = new URL(rawUrl, "http://localhost");
       if (url.pathname === "/api/sync/status") {
         return Response.json(makeSyncStatus());
@@ -299,7 +301,8 @@ describe("RootLayout header search", () => {
     let postCalls = 0;
 
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
-      const rawUrl = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const rawUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       const url = new URL(rawUrl, "http://localhost");
       if (url.pathname === "/api/sync/status") {
         return Response.json(makeSyncStatus());
@@ -388,7 +391,8 @@ describe("RootLayout header search", () => {
     let cancelCalls = 0;
 
     globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const rawUrl = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const rawUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       const url = new URL(rawUrl, "http://localhost");
       if (url.pathname === "/api/sync/status") {
         statusCalls += 1;
@@ -402,7 +406,7 @@ describe("RootLayout header search", () => {
         listCalls += 1;
         return Response.json({ items: [], total: 0, limit: 50, offset: 0 });
       }
-      if (url.pathname === "/api/sync/cancel" && init?.method == "POST") {
+      if (url.pathname === "/api/sync/cancel" && init?.method === "POST") {
         cancelCalls += 1;
         return Response.json({ ok: true });
       }
@@ -452,5 +456,4 @@ describe("RootLayout header search", () => {
     await waitFor(() => expect(searchCalls).toBeGreaterThanOrEqual(2));
     expect(MockEventSource.latest?.closeCalls).toBe(1);
   });
-
 });

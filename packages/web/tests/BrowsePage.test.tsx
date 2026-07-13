@@ -1,5 +1,7 @@
 import "./setup";
 import { afterEach, describe, expect, mock, test } from "bun:test";
+import { BrowsePage } from "@/pages/BrowsePage";
+import type { BrowseFilters, SyncState } from "@/types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -10,8 +12,6 @@ import {
   createRouter,
 } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { BrowseFilters, SyncState } from "@/types";
-import { BrowsePage } from "@/pages/BrowsePage";
 
 const originalFetch = globalThis.fetch;
 
@@ -83,7 +83,8 @@ describe("BrowsePage pagination", () => {
     const listOffsets: number[] = [];
 
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
-      const rawUrl = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const rawUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       const url = new URL(rawUrl, "http://localhost");
 
       if (url.pathname === "/api/tags") {
@@ -118,7 +119,8 @@ describe("BrowsePage pagination", () => {
 
   test("uses the API-reported search total instead of the current page item count", async () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
-      const rawUrl = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const rawUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       const url = new URL(rawUrl, "http://localhost");
 
       if (url.pathname === "/api/tags") {
@@ -154,7 +156,8 @@ describe("BrowsePage pagination", () => {
     const searchOffsets: number[] = [];
 
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
-      const rawUrl = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const rawUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       const url = new URL(rawUrl, "http://localhost");
 
       if (url.pathname === "/api/tags") {
@@ -197,7 +200,8 @@ describe("BrowsePage pagination", () => {
     const listOffsets: number[] = [];
 
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
-      const rawUrl = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const rawUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       const url = new URL(rawUrl, "http://localhost");
 
       if (url.pathname === "/api/tags") {
@@ -234,7 +238,8 @@ describe("BrowsePage pagination", () => {
     const searchOffsets: number[] = [];
 
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
-      const rawUrl = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const rawUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       const url = new URL(rawUrl, "http://localhost");
 
       if (url.pathname === "/api/tags") {

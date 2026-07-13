@@ -1,13 +1,12 @@
+import type { PostRow } from "@/types";
 import { ExternalLink, ImageOff, Play } from "lucide-react";
 import { useState } from "react";
-import type { PostRow } from "@/types";
 import { Badge } from "./ui/badge";
 
 /** Try to extract media info from raw_json without exposing it to parents. */
-function parseMediaFromRaw(raw: string):
-  | { kind: "gallery"; urls: string[] }
-  | { kind: "video"; poster: string | null }
-  | null {
+function parseMediaFromRaw(
+  raw: string,
+): { kind: "gallery"; urls: string[] } | { kind: "video"; poster: string | null } | null {
   try {
     const data = JSON.parse(raw) as {
       data: {

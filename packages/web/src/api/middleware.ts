@@ -16,9 +16,7 @@ export function cspMiddleware(): MiddlewareHandler {
   const imgSrc = ["'self'", "data:", "blob:", ...REDDIT_MEDIA_HOSTS].join(" ");
   const mediaSrc = ["'self'", "blob:", ...REDDIT_MEDIA_HOSTS].join(" ");
   // In dev, Vite injects inline modules + HMR websocket. In prod we keep scripts self-only.
-  const scriptSrc = isDev
-    ? "'self' 'unsafe-inline' 'unsafe-eval'"
-    : "'self'";
+  const scriptSrc = isDev ? "'self' 'unsafe-inline' 'unsafe-eval'" : "'self'";
   const styleSrc = isDev ? "'self' 'unsafe-inline'" : "'self' 'unsafe-inline'";
   const connectSrc = isDev ? "'self' ws: wss:" : "'self'";
 

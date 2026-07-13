@@ -24,9 +24,7 @@ describe("resolveDistAssetPath", () => {
     expect(resolveDistAssetPath(distDir, "/assets/index-abc123.js")).toBe(
       resolve(distDir, "assets/index-abc123.js"),
     );
-    expect(resolveDistAssetPath(distDir, "/favicon.ico")).toBe(
-      resolve(distDir, "favicon.ico"),
-    );
+    expect(resolveDistAssetPath(distDir, "/favicon.ico")).toBe(resolve(distDir, "favicon.ico"));
   });
 
   test("returns null for the root route and traversal attempts", () => {

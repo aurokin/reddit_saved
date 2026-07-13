@@ -1,4 +1,4 @@
-import { SessionManager, TokenManager } from "@reddit-saved/core";
+import type { SessionManager, TokenManager } from "@reddit-saved/core";
 
 export type AuthMode = "session" | "oauth";
 

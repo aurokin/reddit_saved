@@ -1,5 +1,3 @@
-import { useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { FilterPanel } from "@/components/FilterPanel";
@@ -7,8 +5,10 @@ import { PostList } from "@/components/PostList";
 import { SearchBar } from "@/components/SearchBar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useSearchPosts, useSyncStatus, usePosts, useTags } from "@/hooks/queries";
+import { usePosts, useSearchPosts, useSyncStatus, useTags } from "@/hooks/queries";
 import type { BrowseFilters } from "@/types";
+import { useNavigate, useSearch } from "@tanstack/react-router";
+import { useEffect, useMemo } from "react";
 
 const PAGE_SIZE = 50;
 
@@ -55,8 +55,8 @@ export function BrowsePage() {
   const search = useSearchPosts({ ...listParams, q: filters.q });
 
   const active = isSearch ? search : list;
-  const items = isSearch ? search.data?.items ?? [] : list.data?.items ?? [];
-  const total = isSearch ? search.data?.total ?? 0 : list.data?.total ?? 0;
+  const items = isSearch ? (search.data?.items ?? []) : (list.data?.items ?? []);
+  const total = isSearch ? (search.data?.total ?? 0) : (list.data?.total ?? 0);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const clampedPage = total > 0 ? Math.min(page, totalPages) : page;
   const isPageOutOfRange = page !== clampedPage;

@@ -1,6 +1,6 @@
-import { X } from "lucide-react";
 import type { ContentOrigin } from "@/types";
 import type { BrowseFilters } from "@/types";
+import { X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 
@@ -59,12 +59,7 @@ export function FilterPanel({
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold">Filters</h2>
         {hasActive ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearFilters}
-            data-testid="clear-filters"
-          >
+          <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="clear-filters">
             <X className="h-3.5 w-3.5" /> Clear
           </Button>
         ) : null}
@@ -133,9 +128,7 @@ export function FilterPanel({
               key={o.value}
               variant={filters.origin === o.value ? "default" : "outline"}
               size="sm"
-              onClick={() =>
-                setField("origin", filters.origin === o.value ? undefined : o.value)
-              }
+              onClick={() => setField("origin", filters.origin === o.value ? undefined : o.value)}
             >
               {o.label}
             </Button>

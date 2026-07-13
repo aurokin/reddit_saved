@@ -1,8 +1,8 @@
 import {
   Outlet,
-  RootRoute,
-  Route,
-  Router,
+  type RootRoute,
+  type Route,
+  type Router,
   createRootRoute,
   createRoute,
   createRouter,

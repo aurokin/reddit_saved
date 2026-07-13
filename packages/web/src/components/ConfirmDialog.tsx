@@ -1,3 +1,4 @@
+import { Button } from "./ui/button";
 import {
   Dialog,
   DialogContent,
@@ -6,7 +7,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import { Button } from "./ui/button";
 
 export function ConfirmDialog({
   open,

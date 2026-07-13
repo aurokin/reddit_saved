@@ -147,9 +147,7 @@ export class RedditApiClient {
 
     // Cookie-mode (/api/v1/me.json) wraps the user in { kind: "t2", data: { name } }.
     // OAuth (/api/v1/me) returns { name } at top level.
-    const raw = response.body as
-      | { name?: string; error?: string; data?: { name?: string } }
-      | null;
+    const raw = response.body as { name?: string; error?: string; data?: { name?: string } } | null;
     if (!raw || raw.error) {
       throw new Error(`Failed to fetch username: ${raw?.error ?? "empty response"}`);
     }

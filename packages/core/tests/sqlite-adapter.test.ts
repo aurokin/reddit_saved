@@ -2,10 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import {
-  SEARCH_SNIPPET_HIGHLIGHT_END,
-  SEARCH_SNIPPET_HIGHLIGHT_START,
-} from "../src/constants";
+import { SEARCH_SNIPPET_HIGHLIGHT_END, SEARCH_SNIPPET_HIGHLIGHT_START } from "../src/constants";
 import { SqliteAdapter } from "../src/storage/sqlite-adapter";
 import { TagManager } from "../src/tags/tag-manager";
 import type { RedditItem } from "../src/types";

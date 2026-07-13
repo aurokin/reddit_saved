@@ -10,9 +10,9 @@ import { cspMiddleware, errorHandler, loggerMiddleware } from "./middleware";
 import authRoute from "./routes/auth";
 import exportRoute from "./routes/export";
 import postsRoute from "./routes/posts";
-import { resolveDistAssetPath, shouldServeSpaFallback } from "./static";
 import syncRoute, { unsaveHandler } from "./routes/sync";
 import tagsRoute from "./routes/tags";
+import { resolveDistAssetPath, shouldServeSpaFallback } from "./static";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const DIST_DIR = resolve(process.cwd(), "dist");
@@ -57,8 +57,9 @@ const MIME: Record<string, string> = {
 // SPA fallback — only in prod, only for non-/api/* paths.
 if (IS_PROD) {
   if (!existsSync(DIST_DIR)) {
-    console.warn(`[server] NODE_ENV=production but no dist/ found at ${DIST_DIR}. ` +
-      "Run 'bun run build' first.");
+    console.warn(
+      `[server] NODE_ENV=production but no dist/ found at ${DIST_DIR}. Run 'bun run build' first.`,
+    );
   }
   app.get("*", async (c) => {
     const url = new URL(c.req.url);

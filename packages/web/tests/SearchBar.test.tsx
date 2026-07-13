@@ -1,7 +1,7 @@
 import "./setup";
 import { describe, expect, test } from "bun:test";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { SearchBar } from "@/components/SearchBar";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithClient as renderWithProviders } from "./render";
 
 describe("SearchBar", () => {
@@ -37,9 +37,15 @@ describe("SearchBar", () => {
 
   test("does not emit a controlled value again when the parent rerenders", async () => {
     let calls = 0;
-    const { rerender } = renderWithProviders(<SearchBar value="rust" debounceMs={20} onSearch={() => {
-      calls++;
-    }} />);
+    const { rerender } = renderWithProviders(
+      <SearchBar
+        value="rust"
+        debounceMs={20}
+        onSearch={() => {
+          calls++;
+        }}
+      />,
+    );
 
     rerender(
       <SearchBar

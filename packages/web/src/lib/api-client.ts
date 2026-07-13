@@ -49,7 +49,9 @@ export async function apiFetch<T>(path: string, init: RequestInitJson = {}): Pro
   return (await res.json()) as T;
 }
 
-export function apiSearchParams(params: Record<string, string | number | boolean | undefined>): string {
+export function apiSearchParams(
+  params: Record<string, string | number | boolean | undefined>,
+): string {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
     if (v === undefined || v === "" || v === null) continue;

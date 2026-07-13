@@ -1,13 +1,8 @@
-import { Plus, X } from "lucide-react";
-import { useState } from "react";
-import {
-  useAddPostTag,
-  useCreateTag,
-  useRemovePostTag,
-  useTags,
-} from "@/hooks/queries";
+import { useAddPostTag, useCreateTag, useRemovePostTag, useTags } from "@/hooks/queries";
 import { parseTags } from "@/lib/utils";
 import type { PostRow } from "@/types";
+import { Plus, X } from "lucide-react";
+import { useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
