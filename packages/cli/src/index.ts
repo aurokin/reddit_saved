@@ -8,67 +8,8 @@
 
 import { VERSION } from "@reddit-saved/core";
 import { flagBool, flagStr, parseArgs } from "./args";
+import { COMMANDS } from "./commands/registry";
 import { printError, setOutputMode } from "./output";
-
-// Auth commands
-import { authLogin } from "./auth/login";
-import { authLogout } from "./auth/logout";
-import { authStatus } from "./auth/status";
-
-import { backupInitCmd, backupStatusCmd, backupSyncCmd } from "./commands/backup";
-import { exportCmd } from "./commands/export";
-// Data commands
-import { fetchCmd } from "./commands/fetch";
-import { fetchContextCmd } from "./commands/fetch-context";
-import { linksRebuildCmd, linksSearchCmd, linksTopCmd } from "./commands/links";
-import { listCmd } from "./commands/list";
-import { researchCmd } from "./commands/research";
-import { searchCmd } from "./commands/search";
-import { statusCmd } from "./commands/status";
-import { unsaveCmd } from "./commands/unsave";
-
-// Tag commands
-import {
-  tagAdd,
-  tagCreate,
-  tagDelete,
-  tagList,
-  tagRemove,
-  tagRename,
-  tagShow,
-} from "./commands/tag";
-
-type CommandHandler = (
-  flags: Record<string, string | boolean>,
-  positionals: string[],
-) => Promise<void>;
-
-const COMMANDS: Record<string, CommandHandler> = {
-  "auth login": authLogin,
-  "auth status": authStatus,
-  "auth logout": authLogout,
-  fetch: fetchCmd,
-  "fetch context": fetchContextCmd,
-  search: searchCmd,
-  list: listCmd,
-  research: researchCmd,
-  status: statusCmd,
-  export: exportCmd,
-  unsave: unsaveCmd,
-  "tag list": tagList,
-  "tag create": tagCreate,
-  "tag rename": tagRename,
-  "tag delete": tagDelete,
-  "tag add": tagAdd,
-  "tag remove": tagRemove,
-  "tag show": tagShow,
-  "links top": linksTopCmd,
-  "links search": linksSearchCmd,
-  "links rebuild": linksRebuildCmd,
-  "backup init": backupInitCmd,
-  "backup sync": backupSyncCmd,
-  "backup status": backupStatusCmd,
-};
 
 const USAGE = `reddit-saved v${VERSION} — Manage your Reddit saved posts locally
 

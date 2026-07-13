@@ -509,6 +509,10 @@ export interface ListOptions {
   includeContext?: boolean;
   /** Exclude deleted/removed content, bot posts, and low-score short comments */
   hideLowQuality?: boolean;
+  /** Unix timestamp in seconds; include rows created at or after this time */
+  createdAfter?: number;
+  /** Unix timestamp in seconds; include rows created at or before this time */
+  createdBefore?: number;
   sort?: "created" | "score";
   sortDirection?: "asc" | "desc";
   limit?: number;

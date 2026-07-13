@@ -77,6 +77,14 @@ function buildListFilterParts(opts: ListOptions): { where: string[]; params: Bin
     // exclusion they would drown the user's own saved/upvoted content.
     where.push("p.content_origin != 'context'");
   }
+  if (opts.createdAfter !== undefined) {
+    where.push("p.created_utc >= ?");
+    params.push(opts.createdAfter);
+  }
+  if (opts.createdBefore !== undefined) {
+    where.push("p.created_utc <= ?");
+    params.push(opts.createdBefore);
+  }
   if (opts.tag) {
     where.push(TAG_FILTER_SQL);
     params.push(opts.tag);

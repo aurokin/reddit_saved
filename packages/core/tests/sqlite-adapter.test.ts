@@ -840,3 +840,45 @@ describe("thread context storage", () => {
     expect(stats.activeCountByOrigin.saved).toBe(1);
   });
 });
+
+describe("listPosts date bounds", () => {
+  let dbPath: string;
+  let adapter: SqliteAdapter;
+
+  beforeEach(() => {
+    dbPath = makeTempDb();
+    adapter = new SqliteAdapter(dbPath);
+  });
+
+  afterEach(() => {
+    adapter.close();
+    rmSync(dirname(dbPath), { recursive: true, force: true });
+  });
+
+  test("createdAfter/createdBefore bound list results", () => {
+    adapter.upsertPosts(
+      [makeItem({ id: "d1" }), makeItem({ id: "d2" }), makeItem({ id: "d3" })],
+      "saved",
+    );
+    adapter.getDb().run("UPDATE posts SET created_utc = 1600000000 WHERE id = 'd1'");
+    adapter.getDb().run("UPDATE posts SET created_utc = 1650000000 WHERE id = 'd2'");
+    adapter.getDb().run("UPDATE posts SET created_utc = 1700000000 WHERE id = 'd3'");
+
+    expect(
+      adapter
+        .listPosts({ createdAfter: 1650000000 })
+        .map((r) => r.id)
+        .sort(),
+    ).toEqual(["d2", "d3"]);
+    expect(
+      adapter
+        .listPosts({ createdBefore: 1650000000 })
+        .map((r) => r.id)
+        .sort(),
+    ).toEqual(["d1", "d2"]);
+    expect(
+      adapter.listPosts({ createdAfter: 1610000000, createdBefore: 1690000000 }).map((r) => r.id),
+    ).toEqual(["d2"]);
+    expect(adapter.countPosts({ createdAfter: 1650000000 })).toBe(2);
+  });
+});

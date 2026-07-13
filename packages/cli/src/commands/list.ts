@@ -1,5 +1,5 @@
 import type { ListOptions } from "@reddit-saved/core";
-import { flagBool, flagInt, flagStr, mapTypeFlag } from "../args";
+import { flagBool, flagInt, flagStr, mapTypeFlag, parseDateFlag } from "../args";
 import { createContext } from "../context";
 import {
   POST_COLUMNS,
@@ -39,6 +39,12 @@ export async function listCmd(
   const ctx = await createContext({ dbPath: flagStr(flags, "db") });
 
   try {
+    const createdAfter = parseDateFlag(flagStr(flags, "after"), "after", "start");
+    const createdBefore = parseDateFlag(flagStr(flags, "before"), "before", "end");
+    if (createdAfter !== undefined && createdBefore !== undefined && createdAfter > createdBefore) {
+      throw new Error("--after must be earlier than or equal to --before");
+    }
+
     const opts: ListOptions = {
       subreddit: flagStr(flags, "subreddit"),
       author: flagStr(flags, "author"),
@@ -48,6 +54,8 @@ export async function listCmd(
       kind: mapTypeFlag(flagStr(flags, "type")),
       hideLowQuality: flagBool(flags, "hide-low-quality") || undefined,
       includeContext: flagBool(flags, "include-context") || undefined,
+      createdAfter,
+      createdBefore,
       contentOrigin: originStr as ListOptions["contentOrigin"],
       sort: sortVal as "created" | "score",
       sortDirection: sortDirVal as "asc" | "desc",
