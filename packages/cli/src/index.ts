@@ -18,6 +18,7 @@ import { authStatus } from "./auth/status";
 import { exportCmd } from "./commands/export";
 // Data commands
 import { fetchCmd } from "./commands/fetch";
+import { fetchContextCmd } from "./commands/fetch-context";
 import { listCmd } from "./commands/list";
 import { searchCmd } from "./commands/search";
 import { statusCmd } from "./commands/status";
@@ -44,6 +45,7 @@ const COMMANDS: Record<string, CommandHandler> = {
   "auth status": authStatus,
   "auth logout": authLogout,
   fetch: fetchCmd,
+  "fetch context": fetchContextCmd,
   search: searchCmd,
   list: listCmd,
   status: statusCmd,
@@ -70,6 +72,9 @@ Commands:
   fetch                   Fetch Reddit content into the local cache
                           --type saved|upvoted|submitted|comments (default saved)
                           --all fetches every type; --full resyncs from scratch
+  fetch context           Capture thread context around saved items
+                          --limit N (default 50), --top-comments N (default 20),
+                          --refresh <days> re-captures stale context
   search <query>          Full-text search saved posts
   list                    Browse saved posts with filters
   status                  Show database statistics
@@ -87,6 +92,8 @@ Commands:
 List/search/export options:
   --hide-low-quality      Exclude deleted/removed content, bot posts, and
                           low-score short comments
+  --include-context       Include thread-context rows captured by
+                          'fetch context' (excluded by default)
 
 Global options:
   --human, -H             Human-readable output (tables instead of JSON)

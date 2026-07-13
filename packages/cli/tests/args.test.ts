@@ -20,6 +20,18 @@ describe("parseArgs", () => {
     expect(result.positionals).toEqual(["my-tag"]);
   });
 
+  test("parses fetch context subcommand", () => {
+    const result = parseArgs(["fetch", "context", "--limit", "10"]);
+    expect(result.command).toEqual(["fetch", "context"]);
+    expect(result.flags).toEqual({ limit: "10" });
+  });
+
+  test("bare fetch still parses with flags after the subcommand was added", () => {
+    const result = parseArgs(["fetch", "--all", "--full"]);
+    expect(result.command).toEqual(["fetch"]);
+    expect(result.flags).toEqual({ all: true, full: true });
+  });
+
   test("parses --flag value", () => {
     const result = parseArgs(["fetch", "--type", "saved"]);
     expect(result.command).toEqual(["fetch"]);

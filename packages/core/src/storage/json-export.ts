@@ -15,6 +15,8 @@ export interface ExportOptions {
   kind?: "t1" | "t3";
   /** Exclude deleted/removed content, bot posts, and low-score short comments */
   hideLowQuality?: boolean;
+  /** Include thread-context rows (content_origin = 'context'), excluded by default */
+  includeContext?: boolean;
   /** Max rows to export. Defaults to unlimited (paginates through all results).
    *  A value of `0` returns zero rows — pass `undefined` for unlimited. */
   limit?: number;
@@ -207,6 +209,7 @@ function fetchRows(adapter: StorageAdapter, opts?: ExportOptions): PostRow[] {
       orphaned: opts?.orphaned,
       kind: opts?.kind,
       hideLowQuality: opts?.hideLowQuality,
+      includeContext: opts?.includeContext,
     };
     const page = adapter.listPosts(listOpts);
     if (page.length === 0) break; // defensive: never spin on a broken adapter

@@ -681,3 +681,162 @@ describe("sync run provenance", () => {
     expect(summary.lastRun?.saturated).toBe(true);
   });
 });
+
+describe("thread context storage", () => {
+  let dbPath: string;
+  let adapter: SqliteAdapter;
+
+  beforeEach(() => {
+    dbPath = makeTempDb();
+    adapter = new SqliteAdapter(dbPath);
+  });
+
+  afterEach(() => {
+    adapter.close();
+    rmSync(dirname(dbPath), { recursive: true, force: true });
+  });
+
+  function makeComment(
+    id: string,
+    overrides: Partial<{
+      parent_id: string;
+      body: string;
+      score: number;
+      created_utc: number;
+    }> = {},
+  ): RedditItem {
+    return {
+      kind: "t1",
+      data: {
+        id,
+        name: `t1_${id}`,
+        author: "ctxauthor",
+        subreddit: "ctxsub",
+        permalink: `/r/ctxsub/comments/post1/title/${id}/`,
+        created_utc: overrides.created_utc ?? 1700000000,
+        score: overrides.score ?? 5,
+        body: overrides.body ?? `comment body ${id}`,
+        parent_id: overrides.parent_id,
+        link_id: "t3_post1",
+      },
+    };
+  }
+
+  test("context rows are excluded from list/search/count by default", () => {
+    adapter.upsertPosts([makeItem({ id: "real1", title: "Visible saved post" })], "saved");
+    adapter.upsertContextItems([makeComment("ctx1", { body: "Visible context comment" })]);
+
+    expect(adapter.listPosts({}).map((r) => r.id)).toEqual(["real1"]);
+    expect(adapter.countPosts({})).toBe(1);
+    expect(adapter.searchPosts("Visible", {}).map((r) => r.id)).toEqual(["real1"]);
+    expect(adapter.countSearchPosts("Visible", {})).toBe(1);
+
+    // includeContext opts both in
+    expect(adapter.listPosts({ includeContext: true }).length).toBe(2);
+    expect(adapter.countPosts({ includeContext: true })).toBe(2);
+    expect(adapter.searchPosts("Visible", { includeContext: true }).length).toBe(2);
+
+    // explicit origin filter selects only context rows
+    expect(adapter.listPosts({ contentOrigin: "context" }).map((r) => r.id)).toEqual(["ctx1"]);
+  });
+
+  test("a real sync promotes a context row; context never demotes a real origin", () => {
+    // First seen as context, then saved → promoted
+    adapter.upsertContextItems([makeComment("promo")]);
+    expect(adapter.getPost("promo")?.content_origin).toBe("context");
+    adapter.upsertPosts([makeComment("promo")], "saved");
+    expect(adapter.getPost("promo")?.content_origin).toBe("saved");
+
+    // Context refetch of the now-saved row keeps 'saved'
+    adapter.upsertContextItems([makeComment("promo", { body: "edited" })]);
+    expect(adapter.getPost("promo")?.content_origin).toBe("saved");
+    expect(adapter.getPost("promo")?.body).toBe("edited");
+
+    // Real origins still first-write-wins between each other
+    adapter.upsertPosts([makeComment("promo")], "upvoted");
+    expect(adapter.getPost("promo")?.content_origin).toBe("saved");
+  });
+
+  test("context refresh never resurrects an orphaned row or bumps last_seen_at", () => {
+    adapter.upsertPosts([makeComment("orph")], "saved");
+    const stored = adapter.getPost("orph");
+    if (!stored) throw new Error("row missing");
+
+    // Orphan it (as a full sync would after the item was unsaved)
+    adapter.markOrphaned(stored.last_seen_at + 1, "saved");
+    expect(adapter.getPost("orph")?.is_on_reddit).toBe(0);
+
+    adapter.upsertContextItems([makeComment("orph", { body: "still in some thread" })]);
+    const after = adapter.getPost("orph");
+    expect(after?.is_on_reddit).toBe(0);
+    expect(after?.last_seen_at).toBe(stored.last_seen_at);
+    expect(after?.body).toBe("still in some thread");
+  });
+
+  test("context candidates are unstamped saved rows, newest first", () => {
+    adapter.upsertPosts(
+      [
+        makeItem({ id: "old" }),
+        makeItem({ id: "new" }),
+        makeComment("saved_comment", { created_utc: 1800000000 }),
+      ],
+      "saved",
+    );
+    adapter.getDb().run("UPDATE posts SET created_utc = 1600000000 WHERE id = 'old'");
+    adapter.getDb().run("UPDATE posts SET created_utc = 1700000001 WHERE id = 'new'");
+    // Non-saved and context rows are never candidates
+    adapter.upsertPosts([makeItem({ id: "upv" })], "upvoted");
+    adapter.upsertContextItems([makeComment("ctx_only")]);
+
+    expect(adapter.getContextCandidates(10).map((r) => r.id)).toEqual([
+      "saved_comment",
+      "new",
+      "old",
+    ]);
+    expect(adapter.getContextCandidates(2).map((r) => r.id)).toEqual(["saved_comment", "new"]);
+
+    adapter.markContextFetched("new");
+    expect(adapter.getContextCandidates(10).map((r) => r.id)).toEqual(["saved_comment", "old"]);
+
+    // refreshedBefore re-includes rows stamped before the cutoff
+    expect(adapter.getContextCandidates(10, Date.now() + 1000).map((r) => r.id)).toEqual([
+      "saved_comment",
+      "new",
+      "old",
+    ]);
+  });
+
+  test("getThread returns ancestors and descendants across origins", () => {
+    // post1 ← c1 ← c2 ← c3 (saved), plus unrelated row
+    adapter.upsertPosts([makeItem({ id: "post1" })], "saved");
+    adapter.upsertContextItems([
+      makeComment("c1", { parent_id: "t3_post1", created_utc: 1700000010 }),
+      makeComment("c2", { parent_id: "t1_c1", created_utc: 1700000020 }),
+    ]);
+    adapter.upsertPosts(
+      [makeComment("c3", { parent_id: "t1_c2", created_utc: 1700000030 })],
+      "saved",
+    );
+    adapter.upsertPosts([makeItem({ id: "unrelated" })], "saved");
+
+    const fromMiddle = adapter.getThread("t1_c2").map((r) => r.id);
+    expect(fromMiddle).toEqual(["post1", "c1", "c2", "c3"]);
+
+    const fromRoot = adapter.getThread("t3_post1").map((r) => r.id);
+    expect(fromRoot).toEqual(["post1", "c1", "c2", "c3"]);
+
+    expect(adapter.getThread("t3_missing")).toEqual([]);
+  });
+
+  test("stats exclude context rows and report contextCount", () => {
+    adapter.upsertPosts([makeItem({ id: "s1", subreddit: "mysub" })], "saved");
+    adapter.upsertContextItems([makeComment("ctx1"), makeComment("ctx2")]);
+
+    const stats = adapter.getStats();
+    expect(stats.totalPosts).toBe(1);
+    expect(stats.totalComments).toBe(0);
+    expect(stats.contextCount).toBe(2);
+    expect(stats.subredditCounts.find((s) => s.subreddit === "ctxsub")).toBeUndefined();
+    expect(stats.activeCountByOrigin.saved).toBe(1);
+  });
+});

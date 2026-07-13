@@ -37,6 +37,7 @@ export async function searchCmd(
       orphaned: flagBool(flags, "orphaned") || undefined,
       kind: mapTypeFlag(flagStr(flags, "type")),
       hideLowQuality: flagBool(flags, "hide-low-quality") || undefined,
+      includeContext: flagBool(flags, "include-context") || undefined,
       createdAfter,
       createdBefore,
       limit: flagInt(flags, "limit") ?? 25,

@@ -5,8 +5,13 @@
 /** Comment sort order options for Reddit API */
 export type CommentSortOrder = "top" | "best" | "controversial" | "new" | "old" | "qa";
 
-/** Content origin tracking */
+/** Content origin tracking — the four Reddit listings we sync */
 export type ContentOrigin = "saved" | "upvoted" | "submitted" | "commented";
+
+/** What a stored row can be tagged as: a sync origin, or 'context' for
+ *  thread-context rows captured around saved items. Context rows are excluded
+ *  from list/search by default and never participate in orphan detection. */
+export type StoredOrigin = ContentOrigin | "context";
 
 export type PostType = "text" | "link" | "image" | "video";
 export type FilterMode = "include" | "exclude";
@@ -438,7 +443,7 @@ export interface PostRow {
   id: string;
   name: string;
   kind: string;
-  content_origin: ContentOrigin;
+  content_origin: StoredOrigin;
   title: string | null;
   author: string;
   subreddit: string;
@@ -482,6 +487,9 @@ export interface PostRow {
   is_on_reddit: number;
   /** Epoch milliseconds (Date.now()) when last seen during sync */
   last_seen_at: number;
+  /** Epoch milliseconds when thread context was last captured for this row,
+   *  or null if never (only set on rows context capture has processed) */
+  context_fetched_at?: number | null;
   raw_json: string;
 
   // Joined from queries (not always present)
@@ -496,7 +504,9 @@ export interface ListOptions {
   /** true = orphaned only, false/undefined = active only, "all" = both */
   orphaned?: boolean | "all";
   kind?: "t1" | "t3";
-  contentOrigin?: ContentOrigin;
+  contentOrigin?: StoredOrigin;
+  /** Include thread-context rows (content_origin = 'context'), excluded by default */
+  includeContext?: boolean;
   /** Exclude deleted/removed content, bot posts, and low-score short comments */
   hideLowQuality?: boolean;
   sort?: "created" | "score";
@@ -513,7 +523,9 @@ export interface SearchOptions {
   /** true = orphaned only, false/undefined = active only, "all" = both */
   orphaned?: boolean | "all";
   kind?: "t1" | "t3";
-  contentOrigin?: ContentOrigin;
+  contentOrigin?: StoredOrigin;
+  /** Include thread-context rows (content_origin = 'context'), excluded by default */
+  includeContext?: boolean;
   /** Exclude deleted/removed content, bot posts, and low-score short comments */
   hideLowQuality?: boolean;
   /** Unix timestamp in seconds; include rows created at or after this time */
@@ -562,6 +574,8 @@ export interface DbStats {
   orphanedCount: number;
   /** Active (non-orphaned) item counts per content_origin — used for API window checks in orphan detection */
   activeCountByOrigin: Record<ContentOrigin, number>;
+  /** Thread-context rows captured around saved items (excluded from the counts above) */
+  contextCount: number;
   subredditCounts: Array<{ subreddit: string; count: number }>;
   tagCounts: Array<{ name: string; count: number }>;
   oldestItem: number | null;
@@ -591,6 +605,10 @@ export interface TagWithCount extends Tag {
 export interface StorageAdapter {
   // Posts
   upsertPosts(items: RedditItem[], origin: ContentOrigin): void;
+  /** Store thread-context rows. Unlike upsertPosts, a conflict with an existing
+   *  real-origin row must not touch is_on_reddit/last_seen_at (context capture
+   *  must never resurrect an orphaned row or shield one from orphan detection). */
+  upsertContextItems(items: RedditItem[]): void;
   getPost(id: string): PostRow | null;
   listPosts(opts: ListOptions): PostRow[];
   countPosts(opts: ListOptions): number;

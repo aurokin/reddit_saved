@@ -3,6 +3,7 @@ export type {
   // Reddit API types
   CommentSortOrder,
   ContentOrigin,
+  StoredOrigin,
   PostType,
   FilterMode,
   DateRangePreset,
@@ -161,6 +162,14 @@ export { SyncStateManager, createOriginCheckpointManager } from "./sync/state-ma
 export type { CheckpointData } from "./sync/state-manager";
 export { detectOrphans } from "./sync/diff";
 export type { OrphanDetectionResult } from "./sync/diff";
+export {
+  syncContext,
+  CONTEXT_SYNC_DEFAULT_LIMIT,
+  CONTEXT_SYNC_DEFAULT_TOP_COMMENTS,
+  CONTEXT_SYNC_DEFAULT_MIN_COMMENT_SCORE,
+  CONTEXT_SYNC_ANCESTOR_DEPTH,
+} from "./sync/context-sync";
+export type { ContextSyncOptions, ContextSyncResult } from "./sync/context-sync";
 
 // API
 export { RedditApiClient } from "./api/client";

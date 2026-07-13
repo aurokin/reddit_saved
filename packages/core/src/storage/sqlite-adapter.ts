@@ -63,6 +63,10 @@ function buildListFilterParts(opts: ListOptions): { where: string[]; params: Bin
   if (opts.contentOrigin) {
     where.push("p.content_origin = ?");
     params.push(opts.contentOrigin);
+  } else if (!opts.includeContext) {
+    // Thread-context rows are supporting material — without this default
+    // exclusion they would drown the user's own saved/upvoted content.
+    where.push("p.content_origin != 'context'");
   }
   if (opts.tag) {
     where.push(TAG_FILTER_SQL);
@@ -117,6 +121,8 @@ function buildSearchFilterParts(
   if (opts.contentOrigin) {
     where.push("p.content_origin = ?");
     params.push(opts.contentOrigin);
+  } else if (!opts.includeContext) {
+    where.push("p.content_origin != 'context'");
   }
   if (opts.createdAfter !== undefined) {
     where.push("p.created_utc >= ?");
@@ -190,8 +196,15 @@ export class SqliteAdapter implements StorageAdapter {
           $distinguished, $edited, $stickied, $spoiler, $locked, $archived,
           $fetched_at, $updated_at, $is_on_reddit, $last_seen_at, $raw_json
         )
-        -- content_origin intentionally omitted: first-write-wins preserves how the item was originally fetched
+        -- content_origin: first-write-wins between real origins, but a row
+        -- first seen as thread context is promoted when a real sync fetches it
+        -- ('context' is the lowest-priority origin; a context refetch can never
+        -- demote a real origin because this statement only receives real ones).
         ON CONFLICT(id) DO UPDATE SET
+          content_origin = CASE
+            WHEN posts.content_origin = 'context' THEN excluded.content_origin
+            ELSE posts.content_origin
+          END,
           title = excluded.title,
           selftext = excluded.selftext,
           body = excluded.body,
@@ -221,6 +234,102 @@ export class SqliteAdapter implements StorageAdapter {
         rebuildFts(this.db);
       }
     })();
+  }
+
+  upsertContextItems(items: RedditItem[]): void {
+    if (items.length === 0) return;
+
+    const rows = items.map((item) => mapRedditItemToRow(item, "context"));
+    // Context capture volume is bounded (ancestors + top comments per item),
+    // so no bulk trigger-drop path is needed here.
+    this.db.transaction(() => {
+      const upsert = this.db.prepare(`
+        INSERT INTO posts (
+          id, name, kind, content_origin, title, author, subreddit, permalink,
+          url, domain, selftext, body, score, created_utc, num_comments,
+          upvote_ratio, is_self, over_18, is_video, is_gallery, post_hint,
+          link_flair_text, thumbnail, preview_url,
+          parent_id, link_id, link_title, link_permalink, is_submitter,
+          distinguished, edited, stickied, spoiler, locked, archived,
+          fetched_at, updated_at, is_on_reddit, last_seen_at, raw_json
+        ) VALUES (
+          $id, $name, $kind, $content_origin, $title, $author, $subreddit, $permalink,
+          $url, $domain, $selftext, $body, $score, $created_utc, $num_comments,
+          $upvote_ratio, $is_self, $over_18, $is_video, $is_gallery, $post_hint,
+          $link_flair_text, $thumbnail, $preview_url,
+          $parent_id, $link_id, $link_title, $link_permalink, $is_submitter,
+          $distinguished, $edited, $stickied, $spoiler, $locked, $archived,
+          $fetched_at, $updated_at, $is_on_reddit, $last_seen_at, $raw_json
+        )
+        -- Context refresh of an existing row: update content only. It must NOT
+        -- touch content_origin (never demote a real origin), is_on_reddit, or
+        -- last_seen_at — bumping those would resurrect an orphaned row or
+        -- shield an unsaved item from the next full sync's orphan detection.
+        ON CONFLICT(id) DO UPDATE SET
+          title = excluded.title,
+          selftext = excluded.selftext,
+          body = excluded.body,
+          score = excluded.score,
+          num_comments = excluded.num_comments,
+          updated_at = excluded.updated_at,
+          raw_json = excluded.raw_json
+      `);
+      for (const row of rows) {
+        upsert.run(rowToBindRecord(row));
+      }
+    })();
+  }
+
+  /** Saved rows whose thread context has never been captured (or was captured
+   *  before refreshedBefore, epoch ms), newest saves first. */
+  getContextCandidates(limit: number, refreshedBefore?: number): PostRow[] {
+    if (refreshedBefore !== undefined) {
+      return this.db
+        .query(
+          `SELECT * FROM posts
+           WHERE content_origin = 'saved' AND is_on_reddit = 1
+             AND (context_fetched_at IS NULL OR context_fetched_at < ?)
+           ORDER BY created_utc DESC LIMIT ?`,
+        )
+        .all(refreshedBefore, limit) as PostRow[];
+    }
+    return this.db
+      .query(
+        `SELECT * FROM posts
+         WHERE content_origin = 'saved' AND is_on_reddit = 1
+           AND context_fetched_at IS NULL
+         ORDER BY created_utc DESC LIMIT ?`,
+      )
+      .all(limit) as PostRow[];
+  }
+
+  /** Stamp a row as context-captured (epoch ms). Called only after its context
+   *  items were stored successfully, so failures retry on the next run. */
+  markContextFetched(id: string, when = Date.now()): void {
+    this.db.run("UPDATE posts SET context_fetched_at = ? WHERE id = ?", [when, id]);
+  }
+
+  /** All stored rows in the same thread as `name` (a Reddit fullname like
+   *  t1_abc/t3_xyz): ancestors via parent_id, plus all stored descendants.
+   *  Includes context rows. Ordered oldest-first for rendering. */
+  getThread(name: string): PostRow[] {
+    return this.db
+      .query(
+        `WITH RECURSIVE ancestors(name, parent_id) AS (
+           SELECT name, parent_id FROM posts WHERE name = ?
+           UNION
+           SELECT p.name, p.parent_id FROM posts p JOIN ancestors a ON p.name = a.parent_id
+         ),
+         descendants(name) AS (
+           SELECT name FROM posts WHERE name = ?
+           UNION
+           SELECT p.name FROM posts p JOIN descendants d ON p.parent_id = d.name
+         )
+         SELECT p.* FROM posts p
+         WHERE p.name IN (SELECT name FROM ancestors UNION SELECT name FROM descendants)
+         ORDER BY p.created_utc ASC`,
+      )
+      .all(name, name) as PostRow[];
   }
 
   getPost(id: string): PostRow | null {
@@ -360,9 +469,16 @@ export class SqliteAdapter implements StorageAdapter {
           SUM(CASE WHEN is_on_reddit = 0 THEN 1 ELSE 0 END) AS orphanedCount,
           MIN(created_utc) AS oldestItem,
           MAX(created_utc) AS newestItem
-        FROM posts`,
+        FROM posts
+        WHERE content_origin != 'context'`,
       )
       .get() as Record<string, number | null>;
+
+    const contextCount = (
+      this.db
+        .query("SELECT COUNT(*) AS count FROM posts WHERE content_origin = 'context'")
+        .get() as { count: number }
+    ).count;
 
     const originRows = this.db
       .query(
@@ -386,7 +502,8 @@ export class SqliteAdapter implements StorageAdapter {
 
     const subredditCounts = this.db
       .query(
-        `SELECT subreddit, COUNT(*) AS count FROM posts WHERE is_on_reddit = 1
+        `SELECT subreddit, COUNT(*) AS count FROM posts
+         WHERE is_on_reddit = 1 AND content_origin != 'context'
          GROUP BY subreddit ORDER BY count DESC`,
       )
       .all() as Array<{ subreddit: string; count: number }>;
@@ -409,6 +526,7 @@ export class SqliteAdapter implements StorageAdapter {
       totalComments: totals.totalComments ?? 0,
       orphanedCount: totals.orphanedCount ?? 0,
       activeCountByOrigin,
+      contextCount,
       subredditCounts,
       tagCounts,
       oldestItem: totals.oldestItem ?? null,

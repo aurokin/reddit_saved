@@ -34,6 +34,9 @@ export async function statusCmd(
         ["Comments", stats.totalComments],
         ["Total", stats.totalPosts + stats.totalComments],
         ["Orphaned", stats.orphanedCount],
+        ...(stats.contextCount > 0
+          ? [["Context items", stats.contextCount] as [string, unknown]]
+          : []),
       ]);
 
       if (stats.lastSyncTime) {

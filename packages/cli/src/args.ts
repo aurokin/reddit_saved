@@ -46,6 +46,7 @@ const COMMAND_WORDS = new Set([
 const SUBCOMMANDS: Record<string, Set<string>> = {
   auth: new Set(["login", "status", "logout"]),
   tag: new Set(["list", "create", "rename", "delete", "add", "remove", "show"]),
+  fetch: new Set(["context"]),
 };
 
 /** Flags that are always boolean — never consume the next argument as a value */
@@ -63,6 +64,7 @@ const BOOLEAN_FLAGS = new Set([
   "open-browser",
   "hide-low-quality",
   "all",
+  "include-context",
 ]);
 
 export function parseArgs(argv: string[]): ParsedArgs {

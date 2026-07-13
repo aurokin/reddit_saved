@@ -10,7 +10,7 @@ import {
   printTable,
 } from "../output";
 
-const VALID_ORIGINS = new Set(["saved", "upvoted", "submitted", "commented"]);
+const VALID_ORIGINS = new Set(["saved", "upvoted", "submitted", "commented", "context"]);
 
 export async function listCmd(
   flags: Record<string, string | boolean>,
@@ -47,6 +47,7 @@ export async function listCmd(
       orphaned: flagBool(flags, "orphaned") || undefined,
       kind: mapTypeFlag(flagStr(flags, "type")),
       hideLowQuality: flagBool(flags, "hide-low-quality") || undefined,
+      includeContext: flagBool(flags, "include-context") || undefined,
       contentOrigin: originStr as ListOptions["contentOrigin"],
       sort: sortVal as "created" | "score",
       sortDirection: sortDirVal as "asc" | "desc",

@@ -168,6 +168,17 @@ export const MIGRATIONS: readonly Migration[] = [
       db.run("CREATE INDEX IF NOT EXISTS idx_sync_runs_origin ON sync_runs(origin, finished_at)");
     },
   },
+  {
+    version: 3,
+    name: "thread context capture",
+    up(db) {
+      // context_fetched_at is epoch MILLISECONDS, set on the *saved* row after
+      // its thread context was captured successfully. NULL means never captured.
+      // Not added to the posts_fts column list (see rules above).
+      db.run("ALTER TABLE posts ADD COLUMN context_fetched_at INTEGER");
+      db.run("CREATE INDEX IF NOT EXISTS idx_posts_context_fetched ON posts(context_fetched_at)");
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

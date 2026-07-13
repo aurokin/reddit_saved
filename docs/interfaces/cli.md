@@ -12,6 +12,7 @@ reddit-saved
 reddit-saved auth login [--open-browser]
 reddit-saved auth status|logout
 reddit-saved fetch [--full] [--type saved|upvoted|submitted|comments | --all] [--limit N]
+reddit-saved fetch context [--limit N] [--top-comments N] [--refresh <days>]
 reddit-saved search <query> [filters...]
 reddit-saved list [filters...]
 reddit-saved export [--format json|csv|markdown] [filters...]
@@ -35,6 +36,12 @@ reddit-saved tag list|create|rename|delete|add|remove|show
   companion-extension session.
 - `fetch --all` runs every content type sequentially; a failing type does not
   abort the rest, and the exit code is 1 if any type errored.
+- `fetch context` captures thread context around saved items (ancestors for
+  saved comments, top comments for saved posts) as `content_origin = 'context'`
+  rows. Context rows are excluded from `list`/`search`/`export` unless
+  `--include-context` (or `--origin context`) is passed, and they never
+  participate in orphan detection. Progress is per-item via
+  `context_fetched_at`; rerun the command to work through the backlog.
 - Each fetch writes a per-origin resume checkpoint
   (`.reddit-import-checkpoint.<origin>.json` next to the database) and records
   provenance in the `sync_runs` table; `status` reports the latest run per

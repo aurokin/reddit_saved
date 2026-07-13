@@ -122,6 +122,19 @@ describe("migrations", () => {
     db.close();
   });
 
+  test("v3 adds context_fetched_at to a pre-v3 database", () => {
+    const db = new Database(dbPath);
+    runMigrations(db, MIGRATIONS.slice(0, 2));
+    expect(getSchemaVersion(db)).toBe(2);
+    const before = db.query("PRAGMA table_info(posts)").all() as { name: string }[];
+    expect(before.map((c) => c.name)).not.toContain("context_fetched_at");
+
+    runMigrations(db);
+    const after = db.query("PRAGMA table_info(posts)").all() as { name: string }[];
+    expect(after.map((c) => c.name)).toContain("context_fetched_at");
+    db.close();
+  });
+
   test("initializeSchema throws when the database is newer than the code", () => {
     const db = new Database(dbPath);
     initializeSchema(db);

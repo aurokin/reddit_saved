@@ -1,12 +1,12 @@
 import { THUMBNAIL_SENTINELS } from "../constants";
-import type { ContentOrigin, PostRow, RedditItem } from "../types";
+import type { PostRow, RedditItem, StoredOrigin } from "../types";
 import { decodeHtmlEntities } from "../utils/html-escape";
 
 /**
  * Map a RedditItem (from the API) to a flat PostRow (for SQLite).
  * Extracts preview_url, thumbnail, and serializes raw_json.
  */
-export function mapRedditItemToRow(item: RedditItem, origin: ContentOrigin): PostRow {
+export function mapRedditItemToRow(item: RedditItem, origin: StoredOrigin): PostRow {
   const d = item.data;
   const now = Date.now();
 
