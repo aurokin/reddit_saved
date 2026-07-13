@@ -8,7 +8,7 @@ import { detectOrphans } from "../src/sync/diff";
 import type { RedditItem } from "../src/types";
 
 function makeTempDb(): string {
-  const dir = mkdtempSync(join(tmpdir(), "reddit-saved-diff-test-"));
+  const dir = mkdtempSync(join(tmpdir(), "reddit-cached-diff-test-"));
   return join(dir, "test.db");
 }
 

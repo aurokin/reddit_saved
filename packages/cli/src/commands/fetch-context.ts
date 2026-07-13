@@ -2,7 +2,7 @@ import {
   CONTEXT_SYNC_DEFAULT_LIMIT,
   CONTEXT_SYNC_DEFAULT_TOP_COMMENTS,
   syncContext,
-} from "@reddit-saved/core";
+} from "@reddit-cached/core";
 import { flagInt, flagStr } from "../args";
 import { createContext } from "../context";
 import {

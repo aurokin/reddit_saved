@@ -7,9 +7,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: [
-      { find: /^@reddit-saved\/core$/, replacement: resolve(__dirname, "../core/src/index.ts") },
+      { find: /^@reddit-cached\/core$/, replacement: resolve(__dirname, "../core/src/index.ts") },
       {
-        find: /^@reddit-saved\/core\/(.*)$/,
+        find: /^@reddit-cached\/core\/(.*)$/,
         replacement: resolve(__dirname, "../core/src/$1"),
       },
       { find: /^@\//, replacement: `${resolve(__dirname, "src")}/` },

@@ -8,7 +8,7 @@ import { TagManager } from "../src/tags/tag-manager";
 import type { RedditItem } from "../src/types";
 
 function makeTempDb(): string {
-  const dir = mkdtempSync(join(tmpdir(), "reddit-saved-export-test-"));
+  const dir = mkdtempSync(join(tmpdir(), "reddit-cached-export-test-"));
   return join(dir, "test.db");
 }
 
@@ -216,7 +216,7 @@ describe("exportToMarkdown", () => {
 
   test("exports header for empty database", () => {
     const md = exportToMarkdown(adapter);
-    expect(md).toContain("# Reddit Saved Export");
+    expect(md).toContain("# Reddit Cached Export");
     expect(md).toContain("0 items");
   });
 

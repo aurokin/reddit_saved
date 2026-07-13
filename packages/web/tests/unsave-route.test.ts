@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { closeAppContext, getAppContext } from "@/api/context";
 import { unsaveHandler } from "@/api/routes/sync";
-import type { RedditItem } from "@reddit-saved/core";
+import type { RedditItem } from "@reddit-cached/core";
 
 function makeItem(id: string): RedditItem {
   return {
@@ -28,7 +28,7 @@ describe("unsave route", () => {
   let originalUnsaveItems: typeof ctx.apiClient.unsaveItems;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-web-unsave-"));
+    tempDir = mkdtempSync(join(tmpdir(), "reddit-cached-web-unsave-"));
     process.env.REDDIT_SAVED_DB = join(tempDir, "test.db");
     ctx = getAppContext();
     originalUnsaveItems = ctx.apiClient.unsaveItems.bind(ctx.apiClient);

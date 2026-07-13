@@ -62,14 +62,14 @@ the same SQLite database, auth files, and sync machinery.
 Purpose: prove the SPA can render meaningful state without Reddit access.
 
 ```bash
-bun run --filter @reddit-saved/web seed
+bun run --filter @reddit-cached/web seed
 cd packages/web
 TEST_MODE=1 bun run dev
 ```
 
 This harness should validate:
 
-- API starts against `./dev-data/reddit-saved.db`
+- API starts against `./dev-data/reddit-cached.db`
 - SPA loads on `:3000`
 - Browse page shows seeded items
 - Settings page can export seeded data
@@ -196,4 +196,4 @@ At the current repo snapshot:
 
 - `bun run typecheck`: passes
 - `bun test`: passes at the workspace root
-- `bun run --filter @reddit-saved/web build`: passes
+- `bun run --filter @reddit-cached/web build`: passes

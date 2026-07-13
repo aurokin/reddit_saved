@@ -4,7 +4,7 @@ Active execution tracking lives in Linear, not in the repo docs.
 
 ## Source Of Truth
 
-- Project: `Reddit Saved`
+- Project: `Reddit Cached`
 - Current hardening milestone: `Repo Hardening`
 
 ## What Belongs In Repo Docs

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { closeAppContext, getAppContext } from "@/api/context";
 import postsRoute from "@/api/routes/posts";
-import type { RedditItem } from "@reddit-saved/core";
+import type { RedditItem } from "@reddit-cached/core";
 
 function makeItem(id: string, title: string): RedditItem {
   return {
@@ -26,7 +26,7 @@ describe("posts route", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-web-posts-"));
+    tempDir = mkdtempSync(join(tmpdir(), "reddit-cached-web-posts-"));
     process.env.REDDIT_SAVED_DB = join(tempDir, "test.db");
   });
 

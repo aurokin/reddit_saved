@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { dirname } from "node:path";
-import { SqliteAdapter } from "@reddit-saved/core";
+import { SqliteAdapter } from "@reddit-cached/core";
 import { parseWindowMs, todayCmd } from "../src/commands/today";
 import { setOutputMode } from "../src/output";
 import { captureConsole, makeTempDb } from "./helpers";

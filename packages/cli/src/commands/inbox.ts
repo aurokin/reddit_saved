@@ -1,4 +1,4 @@
-import type { InboxItemType, ListInboxOptions } from "@reddit-saved/core";
+import type { InboxItemType, ListInboxOptions } from "@reddit-cached/core";
 import { flagBool, flagInt, flagStr } from "../args";
 import { createContext } from "../context";
 import { isHumanMode, printJson, printTable } from "../output";

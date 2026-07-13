@@ -1,4 +1,4 @@
-import { formatDuration } from "@reddit-saved/core";
+import { formatDuration } from "@reddit-cached/core";
 import { flagStr } from "../args";
 import { createContext } from "../context";
 import { isHumanMode, printJson, printSection } from "../output";

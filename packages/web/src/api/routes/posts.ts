@@ -2,7 +2,7 @@
  * Posts routes — list, get, search.
  * Thin wrappers over SqliteAdapter.{listPosts,getPost,searchPosts}.
  */
-import type { ContentOrigin, ListOptions, SearchOptions } from "@reddit-saved/core";
+import type { ContentOrigin, ListOptions, SearchOptions } from "@reddit-cached/core";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { getAppContext } from "../context";

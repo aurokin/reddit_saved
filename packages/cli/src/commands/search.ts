@@ -1,4 +1,4 @@
-import type { SearchOptions } from "@reddit-saved/core";
+import type { SearchOptions } from "@reddit-cached/core";
 import { flagBool, flagInt, flagStr, mapTypeFlag, parseDateFlag } from "../args";
 import { createContext } from "../context";
 import {
@@ -16,7 +16,7 @@ export async function searchCmd(
 ): Promise<void> {
   const query = positionals.join(" ").trim();
   if (!query) {
-    printError("Search query required. Usage: reddit-saved search <query>");
+    printError("Search query required. Usage: reddit-cached search <query>");
     process.exit(1);
   }
 

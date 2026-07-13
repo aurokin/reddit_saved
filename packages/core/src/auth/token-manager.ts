@@ -33,7 +33,7 @@ export class TokenManager implements AuthProvider {
       loaded = (await file.json()) as Partial<AuthSettings>;
     } catch (err) {
       throw new Error(
-        `auth.json is corrupted or unreadable. Delete it and re-authenticate with 'reddit-saved auth login'. (${err})`,
+        `auth.json is corrupted or unreadable. Delete it and re-authenticate with 'reddit-cached auth login'. (${err})`,
       );
     }
 
@@ -52,7 +52,7 @@ export class TokenManager implements AuthProvider {
     ) {
       throw new Error(
         "auth.json is missing or has invalid required fields. " +
-          "Re-authenticate with 'reddit-saved auth login'.",
+          "Re-authenticate with 'reddit-cached auth login'.",
       );
     }
 
@@ -61,7 +61,7 @@ export class TokenManager implements AuthProvider {
     if (!clientSecret && requireClientSecret) {
       const err = new Error(
         "REDDIT_CLIENT_SECRET env var is not set. This is required for token refresh. " +
-          "Set the env var and retry, or re-authenticate with 'reddit-saved auth login'.",
+          "Set the env var and retry, or re-authenticate with 'reddit-cached auth login'.",
       ) as Error & { code: string };
       err.code = "CLIENT_SECRET_MISSING";
       throw err;
@@ -275,12 +275,12 @@ export class TokenManager implements AuthProvider {
   async ensureValidToken(): Promise<void> {
     if (!this.settings) {
       const loaded = await this.load();
-      if (!loaded) throw new Error("Not authenticated. Run 'reddit-saved auth login' first.");
+      if (!loaded) throw new Error("Not authenticated. Run 'reddit-cached auth login' first.");
     }
 
     // Snapshot after possible concurrent load() — avoid unsafe non-null assertion
     const settings = this.settings;
-    if (!settings) throw new Error("Not authenticated. Run 'reddit-saved auth login' first.");
+    if (!settings) throw new Error("Not authenticated. Run 'reddit-cached auth login' first.");
 
     // Refresh if token expires within 60 seconds
     if (Date.now() >= settings.tokenExpiry - 60_000) {
@@ -294,7 +294,7 @@ export class TokenManager implements AuthProvider {
   /** Get the current auth settings (throws if not authenticated) */
   getSettings(): AuthSettings {
     if (!this.settings) {
-      throw new Error("Not authenticated. Run 'reddit-saved auth login' first.");
+      throw new Error("Not authenticated. Run 'reddit-cached auth login' first.");
     }
     return this.settings;
   }
@@ -324,7 +324,7 @@ export class TokenManager implements AuthProvider {
 
   getAuthContext(): AuthContext {
     if (!this.settings) {
-      throw new Error("Not authenticated. Run 'reddit-saved auth login' first.");
+      throw new Error("Not authenticated. Run 'reddit-cached auth login' first.");
     }
     return {
       headers: {

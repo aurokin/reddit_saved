@@ -12,7 +12,7 @@ import {
   createOriginCheckpointManager,
   detectOrphans,
   syncContext,
-} from "@reddit-saved/core";
+} from "@reddit-cached/core";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { streamSSE } from "hono/streaming";

@@ -1,7 +1,7 @@
-# @reddit-saved/extension
+# @reddit-cached/extension
 
 Companion browser extension. Reads your `reddit.com` session cookies and forwards
-them to the local Reddit Saved app on localhost. The extension never
+them to the local Reddit Cached app on localhost. The extension never
 talks to anything besides reddit.com (read) and the loopback address (write).
 
 ## What it does

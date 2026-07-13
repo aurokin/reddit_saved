@@ -7,7 +7,7 @@ import { SqliteAdapter } from "../src/storage/sqlite-adapter";
 import type { RedditItem } from "../src/types";
 
 function makeTempDb(): string {
-  const dir = mkdtempSync(join(tmpdir(), "reddit-saved-research-"));
+  const dir = mkdtempSync(join(tmpdir(), "reddit-cached-research-"));
   return join(dir, "test.db");
 }
 

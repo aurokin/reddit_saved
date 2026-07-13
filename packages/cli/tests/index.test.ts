@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { SqliteAdapter } from "@reddit-saved/core";
+import { SqliteAdapter } from "@reddit-cached/core";
 import { makeItem, makeTempDb } from "./helpers";
 
 const CLI_PATH = join(import.meta.dir, "../src/index.ts");
@@ -27,7 +27,7 @@ describe("CLI entry point", () => {
     const output = await new Response(proc.stdout).text();
     await proc.exited;
     expect(proc.exitCode).toBe(0);
-    expect(output).toContain("reddit-saved");
+    expect(output).toContain("reddit-cached");
     expect(output).toContain("Commands:");
     expect(output).toContain("auth login");
     expect(output).toContain("tag create");

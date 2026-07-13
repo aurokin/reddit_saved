@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { closeAppContext, getAppContext } from "@/api/context";
 import inboxRoute from "@/api/routes/inbox";
-import type { InboxItemRow, InboxItemType, RedditItem } from "@reddit-saved/core";
+import type { InboxItemRow, InboxItemType, RedditItem } from "@reddit-cached/core";
 
 function makeInboxRow(
   id: string,
@@ -58,7 +58,7 @@ describe("inbox route", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-web-inbox-"));
+    tempDir = mkdtempSync(join(tmpdir(), "reddit-cached-web-inbox-"));
     process.env.REDDIT_SAVED_DB = join(tempDir, "test.db");
   });
 

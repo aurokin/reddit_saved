@@ -9,8 +9,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@reddit-saved/core": ["../core/src/index.ts"],
-      "@reddit-saved/core/*": ["../core/src/*"]
+      "@reddit-cached/core": ["../core/src/index.ts"],
+      "@reddit-cached/core/*": ["../core/src/*"]
     }
   },
   "include": [

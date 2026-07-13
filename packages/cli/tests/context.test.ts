@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { SqliteAdapter } from "@reddit-saved/core";
+import { SqliteAdapter } from "@reddit-cached/core";
 import { setOutputMode } from "../src/output";
 import { ExitCaptured, captureConsole, captureExit, makeTempDb } from "./helpers";
 
@@ -15,7 +15,7 @@ describe("createContext", () => {
   beforeEach(() => {
     // Redirect config dir to a temp dir so no real auth.json is found.
     tempConfigDir = mkdtempSync(join(tmpdir(), "cli-ctx-test-"));
-    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempConfigDir, "reddit-saved");
+    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempConfigDir, "reddit-cached");
     process.env.XDG_DATA_HOME = tempConfigDir;
   });
 
@@ -93,7 +93,7 @@ describe("createContext", () => {
     expect(threw).toBe(true);
 
     // Verify DB is not left locked — should be openable by another adapter
-    const { SqliteAdapter: SA } = await import("@reddit-saved/core");
+    const { SqliteAdapter: SA } = await import("@reddit-cached/core");
     const verify = new SA(dbPath);
     expect(() => verify.getStats()).not.toThrow();
     verify.close();

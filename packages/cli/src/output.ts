@@ -5,7 +5,7 @@
  * Human mode (--human/-H): tables and readable text to stdout, progress to stderr.
  */
 
-import { SEARCH_SNIPPET_HIGHLIGHT_END, SEARCH_SNIPPET_HIGHLIGHT_START } from "@reddit-saved/core";
+import { SEARCH_SNIPPET_HIGHLIGHT_END, SEARCH_SNIPPET_HIGHLIGHT_START } from "@reddit-cached/core";
 
 let _isHuman = false;
 let _isVerbose = false;

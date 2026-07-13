@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { RedditApiClient, type RedditItemData, SqliteAdapter } from "@reddit-saved/core";
+import { RedditApiClient, type RedditItemData, SqliteAdapter } from "@reddit-cached/core";
 import { setOutputMode } from "../src/output";
 import { captureConsole, makeTempDb, restoreFetch } from "./helpers";
 
@@ -16,7 +16,7 @@ describe("fetch context command", () => {
     tempDir = dirname(dbPath);
     setOutputMode(false, false, false);
 
-    const configDir = join(tempDir, "reddit-saved");
+    const configDir = join(tempDir, "reddit-cached");
     mkdirSync(configDir, { recursive: true });
     writeFileSync(
       join(configDir, "auth.json"),

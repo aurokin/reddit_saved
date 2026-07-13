@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { closeAppContext, getAppContext } from "@/api/context";
-import { paths } from "@reddit-saved/core";
+import { paths } from "@reddit-cached/core";
 
 const originalDataDir = process.env.XDG_DATA_HOME;
 const originalDbPath = process.env.REDDIT_SAVED_DB;
@@ -12,7 +12,7 @@ describe("web app context", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-web-context-"));
+    tempDir = mkdtempSync(join(tmpdir(), "reddit-cached-web-context-"));
     process.env.XDG_DATA_HOME = join(tempDir, "data");
     delete process.env.REDDIT_SAVED_DB;
     closeAppContext();
@@ -37,6 +37,6 @@ describe("web app context", () => {
     const ctx = getAppContext();
 
     expect(ctx.dbPath).toBe(paths.database);
-    expect(ctx.dbPath).not.toBe(resolve(process.cwd(), "dev-data/reddit-saved.db"));
+    expect(ctx.dbPath).not.toBe(resolve(process.cwd(), "dev-data/reddit-cached.db"));
   });
 });

@@ -13,8 +13,8 @@
     "rootDir": ".",
     "baseUrl": ".",
     "paths": {
-      "@reddit-saved/core": ["packages/core/src/index.ts"],
-      "@reddit-saved/core/*": ["packages/core/src/*"]
+      "@reddit-cached/core": ["packages/core/src/index.ts"],
+      "@reddit-cached/core/*": ["packages/core/src/*"]
     },
     "types": ["bun"]
   },

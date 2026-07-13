@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { RedditApiClient, SqliteAdapter } from "@reddit-saved/core";
+import { RedditApiClient, SqliteAdapter } from "@reddit-cached/core";
 import { setOutputMode } from "../src/output";
 import { ExitCaptured, captureConsole, captureExit, makeTempDb, restoreFetch } from "./helpers";
 
@@ -48,7 +48,7 @@ describe("fetch command", () => {
     setOutputMode(false, false, false);
 
     // Set up fake config dir with auth.json
-    const configDir = join(tempDir, "reddit-saved");
+    const configDir = join(tempDir, "reddit-cached");
     mkdirSync(configDir, { recursive: true });
     writeFileSync(
       join(configDir, "auth.json"),
@@ -296,7 +296,7 @@ describe("fetch command", () => {
 
   test("resumes from checkpoint when one exists", async () => {
     // Seed a checkpoint file co-located with the DB (matches fetch.ts behavior with --db)
-    const { SyncStateManager } = await import("@reddit-saved/core");
+    const { SyncStateManager } = await import("@reddit-cached/core");
     const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.json");
     const stateManager = new SyncStateManager(checkpointPath);
     const checkpoint = stateManager.createNew();
@@ -374,7 +374,7 @@ describe("fetch command", () => {
     adapter.setSyncState("last_cursor_saved", "stored_cursor_123");
     adapter.close();
 
-    const { SyncStateManager } = await import("@reddit-saved/core");
+    const { SyncStateManager } = await import("@reddit-cached/core");
     const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.json");
     const stateManager = new SyncStateManager(checkpointPath);
     const checkpoint = stateManager.createNew();
@@ -449,7 +449,7 @@ describe("fetch command", () => {
   });
 
   test("leaves a legacy checkpoint from a different origin alone", async () => {
-    const { SyncStateManager } = await import("@reddit-saved/core");
+    const { SyncStateManager } = await import("@reddit-cached/core");
     const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.json");
     const stateManager = new SyncStateManager(checkpointPath);
     const checkpoint = stateManager.createNew(undefined, {
@@ -489,7 +489,7 @@ describe("fetch command", () => {
   });
 
   test("ignores incremental checkpoint during full fetch", async () => {
-    const { SyncStateManager } = await import("@reddit-saved/core");
+    const { SyncStateManager } = await import("@reddit-cached/core");
     const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.json");
     const stateManager = new SyncStateManager(checkpointPath);
     const checkpoint = stateManager.createNew(undefined, { contentOrigin: "saved", isFull: false });
@@ -867,7 +867,7 @@ describe("fetch command", () => {
       adapter.close();
     }
 
-    const { SyncStateManager } = await import("@reddit-saved/core");
+    const { SyncStateManager } = await import("@reddit-cached/core");
     const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.saved.json");
     const stateManager = new SyncStateManager(checkpointPath);
     const checkpoint = await stateManager.load();
@@ -894,7 +894,7 @@ describe("fetch command", () => {
     // path, then survive the error uncleared
     const legacyCheckpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.json");
     const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.saved.json");
-    const { SyncStateManager } = await import("@reddit-saved/core");
+    const { SyncStateManager } = await import("@reddit-cached/core");
     const sm = new SyncStateManager(legacyCheckpointPath);
     const cp = sm.createNew();
     cp.phase = "fetching";
@@ -929,7 +929,7 @@ describe("fetch command", () => {
 
   test("does not advance checkpoint cursor until storage succeeds", async () => {
     const checkpointPath = join(dirname(dbPath), ".reddit-import-checkpoint.saved.json");
-    const { SyncStateManager } = await import("@reddit-saved/core");
+    const { SyncStateManager } = await import("@reddit-cached/core");
     const stateManager = new SyncStateManager(checkpointPath);
     const checkpoint = stateManager.createNew();
     checkpoint.cursor = "resume_cursor_abc";
@@ -1099,9 +1099,9 @@ describe("fetch command", () => {
 
   test("fetches using the extension session when no OAuth auth.json exists", async () => {
     // Replace OAuth credentials with an extension session
-    rmSync(join(tempDir, "reddit-saved", "auth.json"), { force: true });
+    rmSync(join(tempDir, "reddit-cached", "auth.json"), { force: true });
     writeFileSync(
-      join(tempDir, "reddit-saved", "session.json"),
+      join(tempDir, "reddit-cached", "session.json"),
       JSON.stringify({
         cookieHeader: "reddit_session=abc123",
         userAgent: "test-agent",

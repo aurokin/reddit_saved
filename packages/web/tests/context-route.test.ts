@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { closeAppContext, getAppContext } from "@/api/context";
 import syncRoute from "@/api/routes/sync";
-import type { AuthProvider } from "@reddit-saved/core";
+import type { AuthProvider } from "@reddit-cached/core";
 
 const originalConfigDir = process.env.REDDIT_SAVED_CONFIG_DIR;
 
@@ -19,7 +19,7 @@ describe("sync context route", () => {
   let tempDir: string | null = null;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-web-ctx-"));
+    tempDir = mkdtempSync(join(tmpdir(), "reddit-cached-web-ctx-"));
     process.env.TEST_MODE = "1";
     process.env.REDDIT_SAVED_DB = join(tempDir, "test.db");
     process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "config");

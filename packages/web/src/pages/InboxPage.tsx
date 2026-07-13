@@ -161,7 +161,7 @@ export function InboxPage() {
         <EmptyState
           icon={<Inbox className="h-8 w-8" />}
           title="Inbox is empty"
-          description="Run `reddit-saved fetch inbox` or wait for the scheduled job to sync replies, mentions, and messages."
+          description="Run `reddit-cached fetch inbox` or wait for the scheduled job to sync replies, mentions, and messages."
         />
       )}
     </div>

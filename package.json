@@ -1,12 +1,12 @@
 {
-  "name": "reddit-saved",
+  "name": "reddit-cached",
   "private": true,
   "workspaces": ["packages/*"],
   "scripts": {
-    "dev:cli": "bun run --filter @reddit-saved/cli dev",
-    "dev:web": "bun run --filter @reddit-saved/web dev",
+    "dev:cli": "bun run --filter @reddit-cached/cli dev",
+    "dev:web": "bun run --filter @reddit-cached/web dev",
     "build": "bun run --filter '*' build",
-    "verify": "bun run lint && bun run typecheck && bun test && bun run --filter @reddit-saved/web build && (cd packages/cli && bun run src/index.ts --help)",
+    "verify": "bun run lint && bun run typecheck && bun test && bun run --filter @reddit-cached/web build && (cd packages/cli && bun run src/index.ts --help)",
     "test": "bun test",
     "lint": "bunx biome check .",
     "lint:fix": "bunx biome check --write .",

@@ -61,8 +61,8 @@ function setInternalSettings(manager: TokenManager, settings: AuthSettings): voi
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-token-test-"));
-  configDir = join(tempDir, "reddit-saved");
+  tempDir = mkdtempSync(join(tmpdir(), "reddit-cached-token-test-"));
+  configDir = join(tempDir, "reddit-cached");
   mkdirSync(configDir, { recursive: true });
   authFilePath = join(configDir, "auth.json");
   lockFilePath = join(configDir, "auth.lock");

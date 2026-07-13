@@ -70,7 +70,7 @@ export async function linksSearchCmd(
 ): Promise<void> {
   const pattern = positionals.join(" ").trim();
   if (!pattern) {
-    printError("Search pattern required. Usage: reddit-saved links search <pattern>");
+    printError("Search pattern required. Usage: reddit-cached links search <pattern>");
     process.exit(1);
   }
 

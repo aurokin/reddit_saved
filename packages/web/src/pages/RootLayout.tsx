@@ -71,7 +71,7 @@ export function RootLayout({ children }: { children: ReactNode }) {
           </DropdownMenu>
           <Link to="/" className="flex items-center gap-2 font-semibold">
             <Bookmark className="h-5 w-5 text-primary" />
-            <span>Reddit Saved</span>
+            <span>Reddit Cached</span>
           </Link>
 
           <nav className="ml-4 hidden gap-1 text-sm md:flex">
@@ -128,7 +128,7 @@ export function RootLayout({ children }: { children: ReactNode }) {
       </main>
 
       <footer className="border-t border-border py-4 text-center text-xs text-muted-foreground">
-        Reddit Saved · local archive
+        Reddit Cached · local archive
       </footer>
     </div>
   );

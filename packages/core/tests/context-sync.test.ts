@@ -8,7 +8,7 @@ import { syncContext } from "../src/sync/context-sync";
 import type { RedditItem, RedditItemData } from "../src/types";
 
 function makeTempDb(): string {
-  const dir = mkdtempSync(join(tmpdir(), "reddit-saved-context-sync-"));
+  const dir = mkdtempSync(join(tmpdir(), "reddit-cached-context-sync-"));
   return join(dir, "test.db");
 }
 

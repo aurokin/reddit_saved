@@ -36,7 +36,7 @@ describe("buildUserAgent", () => {
   test("fills template with username", () => {
     const ua = buildUserAgent("testuser");
     expect(ua).toContain("testuser");
-    expect(ua).toContain("reddit-saved");
+    expect(ua).toContain("reddit-cached");
   });
 
   test("falls back to 'unknown' for empty username", () => {

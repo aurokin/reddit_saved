@@ -35,7 +35,7 @@ describe("migrations", () => {
   let dbPath: string;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "reddit-saved-migrations-"));
+    dir = mkdtempSync(join(tmpdir(), "reddit-cached-migrations-"));
     dbPath = join(dir, "test.db");
   });
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { dirname } from "node:path";
-import { type InboxItemRow, SqliteAdapter } from "@reddit-saved/core";
+import { type InboxItemRow, SqliteAdapter } from "@reddit-cached/core";
 import { inboxCmd } from "../src/commands/inbox";
 import { setOutputMode } from "../src/output";
 import { captureConsole, makeTempDb } from "./helpers";

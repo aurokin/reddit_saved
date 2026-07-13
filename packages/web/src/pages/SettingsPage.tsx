@@ -180,7 +180,7 @@ export function SettingsPage() {
       <section className="flex flex-col gap-3">
         <h2 className="text-base font-semibold">Scheduled jobs</h2>
         <p className="text-sm text-muted-foreground">
-          Pipeline runs from <code>reddit-saved jobs run</code> (manual or launchd).
+          Pipeline runs from <code>reddit-cached jobs run</code> (manual or launchd).
         </p>
         {jobs.data && jobs.data.items.length > 0 ? (
           <div className="overflow-x-auto rounded-lg border border-border">
@@ -212,7 +212,7 @@ export function SettingsPage() {
         ) : (
           <p className="text-sm text-muted-foreground">
             No pipeline runs yet. Install the hourly agent with{" "}
-            <code>reddit-saved jobs install-launchd</code>.
+            <code>reddit-cached jobs install-launchd</code>.
           </p>
         )}
       </section>

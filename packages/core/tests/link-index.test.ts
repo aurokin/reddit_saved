@@ -123,7 +123,7 @@ describe("isRedditHost", () => {
 });
 
 function makeTempDb(): string {
-  const dir = mkdtempSync(join(tmpdir(), "reddit-saved-links-"));
+  const dir = mkdtempSync(join(tmpdir(), "reddit-cached-links-"));
   return join(dir, "test.db");
 }
 

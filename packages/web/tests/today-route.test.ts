@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { closeAppContext, getAppContext } from "@/api/context";
 import todayRoute from "@/api/routes/today";
-import type { RedditItem, TodayDigest } from "@reddit-saved/core";
+import type { RedditItem, TodayDigest } from "@reddit-cached/core";
 
 function makeItem(id: string): RedditItem {
   return {
@@ -32,7 +32,7 @@ describe("today route", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-web-today-"));
+    tempDir = mkdtempSync(join(tmpdir(), "reddit-cached-web-today-"));
     process.env.REDDIT_SAVED_DB = join(tempDir, "test.db");
   });
 

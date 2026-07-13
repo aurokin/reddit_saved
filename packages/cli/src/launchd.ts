@@ -7,7 +7,7 @@
  * source a shell profile and the backup step needs git.
  */
 
-export const DEFAULT_JOBS_LABEL = "com.reddit-saved.jobs";
+export const DEFAULT_JOBS_LABEL = "com.reddit-cached.jobs";
 export const DEFAULT_JOBS_INTERVAL_SECONDS = 3600;
 
 const LAUNCHD_PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";

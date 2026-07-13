@@ -3,7 +3,7 @@ import {
   exportToCsv,
   exportToJson,
   exportToMarkdown,
-} from "@reddit-saved/core";
+} from "@reddit-cached/core";
 import { flagBool, flagInt, flagStr, mapTypeFlag } from "../args";
 import { createContext } from "../context";
 import { isHumanMode, printError, printInfo, printJson } from "../output";

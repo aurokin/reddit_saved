@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Dev seed: generate ~200 RedditItem fixtures against ./dev-data/reddit-saved.db.
+ * Dev seed: generate ~200 RedditItem fixtures against ./dev-data/reddit-cached.db.
  * Idempotent — drops and re-creates the database file.
  */
 import { mkdirSync, rmSync } from "node:fs";
@@ -12,7 +12,7 @@ import {
   type RedditItem,
   SqliteAdapter,
   TagManager,
-} from "@reddit-saved/core";
+} from "@reddit-cached/core";
 
 const SUBREDDITS = [
   "programming",
@@ -139,7 +139,7 @@ function createRng(seed: number): () => number {
 }
 
 function main(): void {
-  const dbPath = resolve(process.cwd(), "dev-data/reddit-saved.db");
+  const dbPath = resolve(process.cwd(), "dev-data/reddit-cached.db");
   mkdirSync(dirname(dbPath), { recursive: true });
 
   // Wipe old db + sidecar files for idempotency

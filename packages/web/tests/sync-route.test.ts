@@ -10,7 +10,7 @@ import {
   type FetchResult,
   RedditApiClient,
   SyncStateManager,
-} from "@reddit-saved/core";
+} from "@reddit-cached/core";
 
 let tempDir: string | null = null;
 const originalConfigDir = process.env.REDDIT_SAVED_CONFIG_DIR;
@@ -47,7 +47,7 @@ function makeCancelRequest(origin: string | null = "http://localhost:3001"): Req
 
 describe("sync route", () => {
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-web-sync-"));
+    tempDir = mkdtempSync(join(tmpdir(), "reddit-cached-web-sync-"));
     process.env.TEST_MODE = "1";
     process.env.REDDIT_SAVED_DB = join(tempDir, "test.db");
     // Isolate auth files too — without this, tests that unset TEST_MODE would

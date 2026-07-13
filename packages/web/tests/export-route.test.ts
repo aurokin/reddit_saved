@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { closeAppContext, getAppContext } from "@/api/context";
 import exportRoute from "@/api/routes/export";
-import type { RedditItem } from "@reddit-saved/core";
+import type { RedditItem } from "@reddit-cached/core";
 
 function makeItem(id: string, title: string): RedditItem {
   return {
@@ -26,7 +26,7 @@ describe("export route", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-web-export-"));
+    tempDir = mkdtempSync(join(tmpdir(), "reddit-cached-web-export-"));
     process.env.REDDIT_SAVED_DB = join(tempDir, "test.db");
   });
 

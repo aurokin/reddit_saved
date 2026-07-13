@@ -1,19 +1,19 @@
 #!/usr/bin/env bun
 /**
- * reddit-saved CLI entry point.
+ * reddit-cached CLI entry point.
  *
  * Parses arguments, dispatches to the appropriate command handler,
  * and handles top-level errors and exit codes.
  */
 
-import { VERSION } from "@reddit-saved/core";
+import { VERSION } from "@reddit-cached/core";
 import { flagBool, flagStr, parseArgs } from "./args";
 import { COMMANDS } from "./commands/registry";
 import { printError, setOutputMode } from "./output";
 
-const USAGE = `reddit-saved v${VERSION} — Manage your Reddit saved posts locally
+const USAGE = `reddit-cached v${VERSION} — Manage your Reddit saved posts locally
 
-Usage: reddit-saved <command> [options]
+Usage: reddit-cached <command> [options]
 
 Commands:
   auth login [--open-browser]  Authenticate with Reddit OAuth
@@ -119,7 +119,7 @@ async function main(): Promise<void> {
   const handler = COMMANDS[cmdKey];
 
   if (!handler) {
-    printError(`Unknown command: ${cmdKey}. Run 'reddit-saved --help' for usage.`);
+    printError(`Unknown command: ${cmdKey}. Run 'reddit-cached --help' for usage.`);
     process.exit(1);
   }
 

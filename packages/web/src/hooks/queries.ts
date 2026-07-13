@@ -470,7 +470,7 @@ export async function downloadExport(
   link.href = href;
   const disposition = res.headers.get("content-disposition") ?? "";
   const match = /filename="([^"]+)"/.exec(disposition);
-  link.download = match?.[1] ?? `reddit-saved.${format}`;
+  link.download = match?.[1] ?? `reddit-cached.${format}`;
   document.body.appendChild(link);
   link.click();
   link.remove();

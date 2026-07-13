@@ -1,4 +1,4 @@
-import { buildResearchBrief, renderResearchBrief } from "@reddit-saved/core";
+import { buildResearchBrief, renderResearchBrief } from "@reddit-cached/core";
 import { flagBool, flagInt, flagStr, parseDateFlag } from "../args";
 import { createContext } from "../context";
 import { isHumanMode, printError, printInfo, printJson } from "../output";
@@ -11,7 +11,7 @@ export async function researchCmd(
 ): Promise<void> {
   const query = positionals.join(" ").trim();
   if (!query) {
-    printError("Research query required. Usage: reddit-saved research <query>");
+    printError("Research query required. Usage: reddit-cached research <query>");
     process.exit(1);
   }
 

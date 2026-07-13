@@ -7,7 +7,7 @@ import { TagManager } from "../src/tags/tag-manager";
 import type { RedditItem } from "../src/types";
 
 function makeTempDb(): string {
-  const dir = mkdtempSync(join(tmpdir(), "reddit-saved-test-"));
+  const dir = mkdtempSync(join(tmpdir(), "reddit-cached-test-"));
   return join(dir, "test.db");
 }
 

@@ -65,7 +65,7 @@ fallback for users who already registered an app before the freeze.
 
 Concretely:
 
-1. Introduce `AuthProvider` in `@reddit-saved/core`: `ensureValid()`,
+1. Introduce `AuthProvider` in `@reddit-cached/core`: `ensureValid()`,
    `getAuthContext()`, `isAuthenticated()`. `getAuthContext()` returns
    `{headers, baseUrl, pathSuffix, username}` — everything an endpoint
    builder needs.

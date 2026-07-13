@@ -9,7 +9,7 @@ describe("acquireJobLock", () => {
   let lockPath: string;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "reddit-saved-job-lock-"));
+    dir = mkdtempSync(join(tmpdir(), "reddit-cached-job-lock-"));
     lockPath = join(dir, ".reddit-jobs.lock");
   });
 

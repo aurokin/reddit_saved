@@ -1,11 +1,11 @@
 {
-  "name": "@reddit-saved/web",
+  "name": "@reddit-cached/web",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "REDDIT_SAVED_DB=./dev-data/reddit-saved.db bunx concurrently -n server,vite -c blue,green --kill-others \"bun run dev:server\" \"bunx vite\"",
-    "dev:server": "REDDIT_SAVED_DB=./dev-data/reddit-saved.db bun run --watch src/api/server.ts",
-    "dev:server:test": "REDDIT_SAVED_DB=./dev-data/reddit-saved.db TEST_MODE=1 bun run --watch src/api/server.ts",
+    "dev": "REDDIT_SAVED_DB=./dev-data/reddit-cached.db bunx concurrently -n server,vite -c blue,green --kill-others \"bun run dev:server\" \"bunx vite\"",
+    "dev:server": "REDDIT_SAVED_DB=./dev-data/reddit-cached.db bun run --watch src/api/server.ts",
+    "dev:server:test": "REDDIT_SAVED_DB=./dev-data/reddit-cached.db TEST_MODE=1 bun run --watch src/api/server.ts",
     "build": "bunx vite build",
     "preview": "bunx vite preview",
     "start": "NODE_ENV=production bun run src/api/server.ts",
@@ -15,7 +15,7 @@
     "typecheck": "bunx tsc --noEmit"
   },
   "dependencies": {
-    "@reddit-saved/core": "workspace:*",
+    "@reddit-cached/core": "workspace:*",
     "@radix-ui/react-dialog": "^1.1",
     "@radix-ui/react-dropdown-menu": "^2.1",
     "@radix-ui/react-popover": "^1.1",

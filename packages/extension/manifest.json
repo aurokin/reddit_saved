@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Reddit Saved (companion)",
+  "name": "Reddit Cached (companion)",
   "short_name": "RedditSaved",
   "version": "0.1.0",
-  "description": "Forwards your reddit.com session to the local Reddit Saved app on localhost.",
+  "description": "Forwards your reddit.com session to the local Reddit Cached app on localhost.",
   "permissions": ["cookies", "storage", "alarms", "activeTab"],
   "host_permissions": ["*://*.reddit.com/*", "http://localhost/*", "http://127.0.0.1/*"],
   "background": {
@@ -11,7 +11,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Reddit Saved",
+    "default_title": "Reddit Cached",
     "default_popup": "popup.html"
   },
   "browser_specific_settings": {

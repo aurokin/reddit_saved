@@ -9,7 +9,7 @@ import {
   saveConfig,
   writeBackup,
   writeRepoScaffolding,
-} from "@reddit-saved/core";
+} from "@reddit-cached/core";
 import { flagBool, flagStr } from "../args";
 import { type CliContext, createContext } from "../context";
 import { isHumanMode, printError, printJson, printSection } from "../output";
@@ -21,7 +21,7 @@ async function requireBackupConfig(flags: Record<string, string | boolean>): Pro
   const config = await loadConfig();
   if (!config.backup?.repoPath) {
     printError(
-      "No backup repository configured. Run 'reddit-saved backup init --repo <path>' first.",
+      "No backup repository configured. Run 'reddit-cached backup init --repo <path>' first.",
       "BACKUP_NOT_CONFIGURED",
     );
     process.exit(1);
@@ -35,7 +35,7 @@ export async function backupInitCmd(
 ): Promise<void> {
   const repoFlag = flagStr(flags, "repo");
   if (!repoFlag) {
-    printError("Usage: reddit-saved backup init --repo <path> [--remote <name>] [--push]");
+    printError("Usage: reddit-cached backup init --repo <path> [--remote <name>] [--push]");
     process.exit(1);
   }
   const repoPath = resolve(repoFlag);
@@ -57,7 +57,7 @@ export async function backupInitCmd(
       ["Git repo", initialized ? "initialized" : "already present"],
       ...(remote ? [["Remote", remote] as [string, unknown]] : []),
       ["Push by default", push ? "yes" : "no"],
-      ["Next step", "run 'reddit-saved backup sync'"],
+      ["Next step", "run 'reddit-cached backup sync'"],
     ]);
     console.log();
   } else {

@@ -4,7 +4,7 @@
  *
  * In TEST_MODE, /login is a no-op since Playwright seeds auth.json directly.
  */
-import { type OAuthServerHandle, type SessionPayload, startOAuthServer } from "@reddit-saved/core";
+import { type OAuthServerHandle, type SessionPayload, startOAuthServer } from "@reddit-cached/core";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { canFallbackToOAuth } from "../auth-routing";
@@ -78,7 +78,7 @@ app.get("/status", async (c) => {
         mode: null,
         error:
           "REDDIT_CLIENT_SECRET env var is not set. This is required for token refresh. " +
-          "Set the env var and retry, or re-authenticate with 'reddit-saved auth login'.",
+          "Set the env var and retry, or re-authenticate with 'reddit-cached auth login'.",
         testMode: ctx.testMode,
       });
     }

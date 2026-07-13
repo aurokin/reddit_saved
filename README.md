@@ -1,6 +1,6 @@
-# Reddit Saved
+# Reddit Cached
 
-Reddit Saved is a local-first archive for Reddit content. It fetches Reddit
+Reddit Cached is a local-first archive for Reddit content. It fetches Reddit
 listings into SQLite, then lets you browse, search, tag, export, and
 selectively unsave against the local database instead of repeatedly walking
 Reddit's paginated API.
@@ -9,7 +9,7 @@ Reddit's paginated API.
 
 ```bash
 bun install
-bun run --filter @reddit-saved/web seed
+bun run --filter @reddit-cached/web seed
 cd packages/web
 TEST_MODE=1 bun run dev
 ```

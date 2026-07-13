@@ -7,7 +7,7 @@ import {
   SqliteAdapter,
   acquireJobLock,
   getJobLockPathForDatabase,
-} from "@reddit-saved/core";
+} from "@reddit-cached/core";
 import { parseJobSteps } from "../src/commands/jobs";
 import { setOutputMode } from "../src/output";
 import { captureConsole, makeTempDb, restoreFetch } from "./helpers";
@@ -50,7 +50,7 @@ describe("jobs run command", () => {
     tempDir = dirname(dbPath);
     setOutputMode(false, false, false);
 
-    const configDir = join(tempDir, "reddit-saved");
+    const configDir = join(tempDir, "reddit-cached");
     mkdirSync(configDir, { recursive: true });
     writeFileSync(
       join(configDir, "auth.json"),

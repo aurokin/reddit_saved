@@ -1,7 +1,7 @@
 /**
  * Inbox routes — read-only views over inbox_items (replies, mentions, PMs).
  */
-import type { InboxItemType, ListInboxOptions } from "@reddit-saved/core";
+import type { InboxItemType, ListInboxOptions } from "@reddit-cached/core";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { getAppContext } from "../context";

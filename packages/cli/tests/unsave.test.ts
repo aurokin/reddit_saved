@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { SqliteAdapter } from "@reddit-saved/core";
+import { SqliteAdapter } from "@reddit-cached/core";
 import { setOutputMode } from "../src/output";
 import {
   ExitCaptured,
@@ -251,7 +251,7 @@ describe("unsave command — API path", () => {
     setOutputMode(false, false, false);
 
     // Set up fake config dir with auth.json
-    const configDir = join(tempDir, "reddit-saved");
+    const configDir = join(tempDir, "reddit-cached");
     mkdirSync(configDir, { recursive: true });
     writeFileSync(
       join(configDir, "auth.json"),

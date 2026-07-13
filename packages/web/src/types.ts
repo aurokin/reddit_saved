@@ -12,7 +12,7 @@ import type {
   TagWithCount,
   TodayDigest,
   TopLink,
-} from "@reddit-saved/core";
+} from "@reddit-cached/core";
 
 export type {
   PostRow,

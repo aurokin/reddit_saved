@@ -1,8 +1,8 @@
-# @reddit-saved/web
+# @reddit-cached/web
 
 ## Read This First
 
-This package is the local web UI for Reddit Saved. It is not a hosted service:
+This package is the local web UI for Reddit Cached. It is not a hosted service:
 the React app and the Hono API run on your machine, talk to the same SQLite
 database as the CLI, and share the same auth files.
 
@@ -18,7 +18,7 @@ From the repo root:
 
 ```bash
 bun install
-bun run --filter @reddit-saved/web seed
+bun run --filter @reddit-cached/web seed
 cd packages/web
 TEST_MODE=1 bun run dev
 ```
@@ -27,7 +27,7 @@ Then open `http://localhost:3000`.
 
 What this does:
 
-- seeds `./dev-data/reddit-saved.db` with deterministic fixture data
+- seeds `./dev-data/reddit-cached.db` with deterministic fixture data
 - starts the API on `:3001`
 - starts Vite on `:3000`
 - keeps Reddit writes and real OAuth disabled
@@ -44,7 +44,7 @@ TEST_MODE=1 bun run dev
 ### Reseed fixture data
 
 ```bash
-bun run --filter @reddit-saved/web seed
+bun run --filter @reddit-cached/web seed
 ```
 
 ### Run the API only
@@ -148,7 +148,7 @@ It is a hard error to run this mode with `NODE_ENV=production`.
 Reseed and restart:
 
 ```bash
-bun run --filter @reddit-saved/web seed
+bun run --filter @reddit-cached/web seed
 cd packages/web
 TEST_MODE=1 bun run dev
 ```
@@ -184,7 +184,7 @@ sources, update the middleware CSP configuration.
 
 | Script | Purpose |
 |---|---|
-| `bun run dev` | API + Vite against `./dev-data/reddit-saved.db` |
+| `bun run dev` | API + Vite against `./dev-data/reddit-cached.db` |
 | `bun run dev:server` | API only |
 | `bun run dev:server:test` | API only in `TEST_MODE` |
 | `bun run build` | Vite production build |

@@ -17,7 +17,7 @@ export async function tagList(
 
     if (isHumanMode()) {
       if (tags.length === 0) {
-        console.log("No tags. Create one with: reddit-saved tag create <name>");
+        console.log("No tags. Create one with: reddit-cached tag create <name>");
         return;
       }
       printTable(
@@ -46,7 +46,7 @@ export async function tagCreate(
 ): Promise<void> {
   const name = positionals[0];
   if (!name) {
-    printError("Tag name required. Usage: reddit-saved tag create <name> [--color #hex]");
+    printError("Tag name required. Usage: reddit-cached tag create <name> [--color #hex]");
     process.exit(1);
   }
 
@@ -77,7 +77,7 @@ export async function tagRename(
   const oldName = positionals[0];
   const newName = positionals[1];
   if (!oldName || !newName) {
-    printError("Usage: reddit-saved tag rename <old-name> <new-name>");
+    printError("Usage: reddit-cached tag rename <old-name> <new-name>");
     process.exit(1);
   }
 
@@ -106,7 +106,7 @@ export async function tagDelete(
 ): Promise<void> {
   const name = positionals[0];
   if (!name) {
-    printError("Usage: reddit-saved tag delete <name>");
+    printError("Usage: reddit-cached tag delete <name>");
     process.exit(1);
   }
 
@@ -135,7 +135,7 @@ export async function tagAdd(
 ): Promise<void> {
   const tagName = positionals[0];
   if (!tagName) {
-    printError("Usage: reddit-saved tag add <tag-name> --to <post-id> [post-id...]");
+    printError("Usage: reddit-cached tag add <tag-name> --to <post-id> [post-id...]");
     process.exit(1);
   }
 
@@ -150,7 +150,7 @@ export async function tagAdd(
   const postIds = [...toIds, ...positionals.slice(1)];
 
   if (postIds.length === 0) {
-    printError("Specify post IDs with --to. Usage: reddit-saved tag add <tag> --to <id> [id...]");
+    printError("Specify post IDs with --to. Usage: reddit-cached tag add <tag> --to <id> [id...]");
     process.exit(1);
   }
 
@@ -191,7 +191,7 @@ export async function tagRemove(
 ): Promise<void> {
   const tagName = positionals[0];
   if (!tagName) {
-    printError("Usage: reddit-saved tag remove <tag-name> --from <post-id> [post-id...]");
+    printError("Usage: reddit-cached tag remove <tag-name> --from <post-id> [post-id...]");
     process.exit(1);
   }
 
@@ -207,7 +207,7 @@ export async function tagRemove(
 
   if (postIds.length === 0) {
     printError(
-      "Specify post IDs with --from. Usage: reddit-saved tag remove <tag> --from <id> [id...]",
+      "Specify post IDs with --from. Usage: reddit-cached tag remove <tag> --from <id> [id...]",
     );
     process.exit(1);
   }
@@ -249,7 +249,7 @@ export async function tagShow(
 ): Promise<void> {
   const postId = positionals[0];
   if (!postId) {
-    printError("Usage: reddit-saved tag show <post-id>");
+    printError("Usage: reddit-cached tag show <post-id>");
     process.exit(1);
   }
 

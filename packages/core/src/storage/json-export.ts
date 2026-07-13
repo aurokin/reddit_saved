@@ -125,7 +125,7 @@ function sanitizeMdField(str: string): string {
 export function exportToMarkdown(adapter: StorageAdapter, opts?: ExportOptions): string {
   const rows = fetchRows(adapter, opts);
   const sections: string[] = [
-    "# Reddit Saved Export",
+    "# Reddit Cached Export",
     "",
     `Exported: ${new Date().toISOString()} | ${rows.length} items`,
     "",

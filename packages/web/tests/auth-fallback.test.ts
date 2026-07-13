@@ -4,7 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { closeAppContext, getAppContext } from "@/api/context";
 import authRoute from "@/api/routes/auth";
-import { REDDIT_BASE_URL, REDDIT_OAUTH_BASE_URL, RedditApiClient, paths } from "@reddit-saved/core";
+import {
+  REDDIT_BASE_URL,
+  REDDIT_OAUTH_BASE_URL,
+  RedditApiClient,
+  paths,
+} from "@reddit-cached/core";
 
 const originalFetch = globalThis.fetch;
 const originalConfigDir = process.env.REDDIT_SAVED_CONFIG_DIR;
@@ -54,7 +59,7 @@ describe("session auth fallback", () => {
   }
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-web-auth-"));
+    tempDir = mkdtempSync(join(tmpdir(), "reddit-cached-web-auth-"));
     process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "config");
     process.env.XDG_DATA_HOME = join(tempDir, "data");
     process.env.REDDIT_SAVED_DB = join(tempDir, "test.db");
@@ -1025,7 +1030,7 @@ describe("session auth fallback", () => {
       mode: null,
       error:
         "REDDIT_CLIENT_SECRET env var is not set. This is required for token refresh. " +
-        "Set the env var and retry, or re-authenticate with 'reddit-saved auth login'.",
+        "Set the env var and retry, or re-authenticate with 'reddit-cached auth login'.",
       testMode: false,
     });
     expect(fetchMock).not.toHaveBeenCalled();

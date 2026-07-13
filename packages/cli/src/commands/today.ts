@@ -1,4 +1,4 @@
-import { buildTodayDigest, renderTodayDigest } from "@reddit-saved/core";
+import { buildTodayDigest, renderTodayDigest } from "@reddit-cached/core";
 import { flagBool, flagStr } from "../args";
 import { createContext } from "../context";
 import { isHumanMode, printError, printInfo, printJson, printWarning } from "../output";

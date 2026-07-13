@@ -8,7 +8,7 @@ import {
   detectOrphans,
   formatDuration,
   paths,
-} from "@reddit-saved/core";
+} from "@reddit-cached/core";
 
 const ORIGIN_MAP: Record<string, ContentOrigin> = {
   saved: "saved",

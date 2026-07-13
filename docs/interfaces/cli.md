@@ -3,36 +3,36 @@
 ## Entry Point
 
 ```text
-reddit-saved
+reddit-cached
 ```
 
 ## Commands
 
 ```text
-reddit-saved auth login [--open-browser]
-reddit-saved auth status|logout
-reddit-saved fetch [--full] [--type saved|upvoted|submitted|comments | --all] [--limit N]
-reddit-saved fetch context [--limit N] [--top-comments N] [--refresh <days>]
-reddit-saved fetch inbox [--limit N]
-reddit-saved inbox [--type comment_reply|post_reply|mention|message] [--unread] [--limit N]
-reddit-saved search <query> [filters...]
-reddit-saved list [filters...]
-reddit-saved research <query> [--limit N] [--since d] [--until d] [--out f.md] [--json]
-reddit-saved today [--window 24h|7d|since-last-job] [--out f.md] [--json]
-reddit-saved export [--format json|csv|markdown] [filters...]
-reddit-saved status
-reddit-saved unsave [selectors...] [--dry-run] --confirm
-reddit-saved tag list|create|rename|delete|add|remove|show
-reddit-saved links top [--window 90d] [--exclude-reddit] [--limit N]
-reddit-saved links search <pattern> [--limit N]
-reddit-saved links rebuild
-reddit-saved backup init --repo <path> [--remote <name>] [--push]
-reddit-saved backup sync [--push] [--no-git]
-reddit-saved backup status
-reddit-saved jobs run [--steps fetch,context,inbox,backup] [--limit N] [--trigger <name>]
-reddit-saved jobs status [--limit N]
-reddit-saved jobs install-launchd [--interval-seconds N] [--steps <list>] [--label <name>] [--no-load]
-reddit-saved jobs uninstall-launchd [--label <name>]
+reddit-cached auth login [--open-browser]
+reddit-cached auth status|logout
+reddit-cached fetch [--full] [--type saved|upvoted|submitted|comments | --all] [--limit N]
+reddit-cached fetch context [--limit N] [--top-comments N] [--refresh <days>]
+reddit-cached fetch inbox [--limit N]
+reddit-cached inbox [--type comment_reply|post_reply|mention|message] [--unread] [--limit N]
+reddit-cached search <query> [filters...]
+reddit-cached list [filters...]
+reddit-cached research <query> [--limit N] [--since d] [--until d] [--out f.md] [--json]
+reddit-cached today [--window 24h|7d|since-last-job] [--out f.md] [--json]
+reddit-cached export [--format json|csv|markdown] [filters...]
+reddit-cached status
+reddit-cached unsave [selectors...] [--dry-run] --confirm
+reddit-cached tag list|create|rename|delete|add|remove|show
+reddit-cached links top [--window 90d] [--exclude-reddit] [--limit N]
+reddit-cached links search <pattern> [--limit N]
+reddit-cached links rebuild
+reddit-cached backup init --repo <path> [--remote <name>] [--push]
+reddit-cached backup sync [--push] [--no-git]
+reddit-cached backup status
+reddit-cached jobs run [--steps fetch,context,inbox,backup] [--limit N] [--trigger <name>]
+reddit-cached jobs status [--limit N]
+reddit-cached jobs install-launchd [--interval-seconds N] [--steps <list>] [--label <name>] [--no-load]
+reddit-cached jobs uninstall-launchd [--label <name>]
 ```
 
 ## Notes
@@ -94,7 +94,7 @@ reddit-saved jobs uninstall-launchd [--label <name>]
   overlapping run exit 0 with `{"skipped":true}` instead of racing; locks
   older than two hours are reclaimed as stale.
 - `jobs install-launchd` (macOS only) writes
-  `~/Library/LaunchAgents/com.reddit-saved.jobs.plist` running `jobs run
+  `~/Library/LaunchAgents/com.reddit-cached.jobs.plist` running `jobs run
   --trigger launchd` every `--interval-seconds` (default hourly, plus once at
   load) and loads it via `launchctl load -w`. Logs land in the data
   directory's `logs/` folder. Re-running the command re-installs with the new

@@ -64,12 +64,12 @@ let originalConfigDir: string | undefined;
 let tempDir: string;
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-oauth-test-"));
+  tempDir = mkdtempSync(join(tmpdir(), "reddit-cached-oauth-test-"));
   originalFetch = globalThis.fetch;
 
   // Redirect auth file writes to temp dir so tests never touch real credentials.
   originalConfigDir = process.env.REDDIT_SAVED_CONFIG_DIR;
-  process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-saved");
+  process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-cached");
 
   // Intercept fetch calls to Reddit OAuth endpoints and redirect to mock.
   // Requests to 127.0.0.1 (the local OAuth callback server) pass through.

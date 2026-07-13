@@ -3,7 +3,7 @@ import type { PostRow, SearchResult } from "@/types";
 import {
   SEARCH_SNIPPET_HIGHLIGHT_END,
   SEARCH_SNIPPET_HIGHLIGHT_START,
-} from "@reddit-saved/core/search-snippet";
+} from "@reddit-cached/core/search-snippet";
 import { Link } from "@tanstack/react-router";
 import { ExternalLink, MessageSquare, ThumbsUp } from "lucide-react";
 import { TagChips } from "./TagChips";

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { closeAppContext, getAppContext } from "@/api/context";
 import linksRoute from "@/api/routes/links";
-import type { RedditItem } from "@reddit-saved/core";
+import type { RedditItem } from "@reddit-cached/core";
 
 function makeItem(
   id: string,
@@ -35,7 +35,7 @@ describe("links routes", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-web-links-"));
+    tempDir = mkdtempSync(join(tmpdir(), "reddit-cached-web-links-"));
     process.env.REDDIT_SAVED_DB = join(tempDir, "test.db");
   });
 

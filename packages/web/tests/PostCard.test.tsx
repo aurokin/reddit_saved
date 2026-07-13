@@ -3,7 +3,7 @@ import { describe, expect, mock, test } from "bun:test";
 import {
   SEARCH_SNIPPET_HIGHLIGHT_END,
   SEARCH_SNIPPET_HIGHLIGHT_START,
-} from "@reddit-saved/core/search-snippet";
+} from "@reddit-cached/core/search-snippet";
 import { screen } from "@testing-library/react";
 
 // Stub @tanstack/react-router Link to a plain anchor so PostCard doesn't

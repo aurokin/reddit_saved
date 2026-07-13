@@ -18,7 +18,7 @@ describe("shouldServeSpaFallback", () => {
 });
 
 describe("resolveDistAssetPath", () => {
-  const distDir = "/tmp/reddit-saved-dist";
+  const distDir = "/tmp/reddit-cached-dist";
 
   test("resolves request paths relative to dist", () => {
     expect(resolveDistAssetPath(distDir, "/assets/index-abc123.js")).toBe(

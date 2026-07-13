@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { COMMANDS } from "../src/commands/registry";
 
 /**
- * Drift guard: every `reddit-saved <command>` mentioned in the agent skill
+ * Drift guard: every `reddit-cached <command>` mentioned in the agent skill
  * must exist in the CLI command registry. If a command is renamed or removed,
  * this test forces the SKILL.md to be updated with it.
  */
@@ -16,22 +16,22 @@ const SKILL_PATH = join(
   "..",
   ".agents",
   "skills",
-  "reddit-saved",
+  "reddit-cached",
   "SKILL.md",
 );
 
 function extractSkillCommands(markdown: string): string[] {
-  // Commands appear in inline code spans (`reddit-saved search "<q>"`) and in
-  // fenced code block lines (reddit-saved status). Prose is not scanned.
+  // Commands appear in inline code spans (`reddit-cached search "<q>"`) and in
+  // fenced code block lines (reddit-cached status). Prose is not scanned.
   const invocations: string[] = [];
-  for (const match of markdown.matchAll(/`reddit-saved ([^`]+)`/g)) {
+  for (const match of markdown.matchAll(/`reddit-cached ([^`]+)`/g)) {
     invocations.push(match[1]);
   }
   for (const block of markdown.matchAll(/```bash\n([\s\S]*?)```/g)) {
     for (const line of block[1].split("\n")) {
       const trimmed = line.trim();
-      if (trimmed.startsWith("reddit-saved ")) {
-        invocations.push(trimmed.slice("reddit-saved ".length));
+      if (trimmed.startsWith("reddit-cached ")) {
+        invocations.push(trimmed.slice("reddit-cached ".length));
       }
     }
   }

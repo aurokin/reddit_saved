@@ -1,4 +1,4 @@
-import { TokenManager } from "@reddit-saved/core";
+import { TokenManager } from "@reddit-cached/core";
 import { isHumanMode, printJson, printSection } from "../output";
 
 export async function authStatus(
@@ -10,7 +10,7 @@ export async function authStatus(
 
   if (!settings) {
     if (isHumanMode()) {
-      console.log("OAuth not authenticated. Run 'reddit-saved auth login' to connect.");
+      console.log("OAuth not authenticated. Run 'reddit-cached auth login' to connect.");
     } else {
       printJson({ authenticated: false, mode: "oauth" });
     }

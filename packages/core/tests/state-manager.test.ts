@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { SyncStateManager } from "../src/sync/state-manager";
 
 function makeTempDir(): string {
-  return mkdtempSync(join(tmpdir(), "reddit-saved-state-test-"));
+  return mkdtempSync(join(tmpdir(), "reddit-cached-state-test-"));
 }
 
 function makeCheckpointFixture(overrides: Record<string, unknown> = {}, now = Date.now()) {

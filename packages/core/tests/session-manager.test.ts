@@ -12,7 +12,7 @@ describe("SessionManager", () => {
   let manager: SessionManager;
 
   beforeEach(async () => {
-    configDir = mkdtempSync(join(tmpdir(), "reddit-saved-session-test-"));
+    configDir = mkdtempSync(join(tmpdir(), "reddit-cached-session-test-"));
     process.env.REDDIT_SAVED_CONFIG_DIR = configDir;
     manager = new SessionManager();
     globalThis.fetch = mock(async () =>

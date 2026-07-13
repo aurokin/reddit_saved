@@ -15,7 +15,7 @@ describe("jobs route", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-web-jobs-"));
+    tempDir = mkdtempSync(join(tmpdir(), "reddit-cached-web-jobs-"));
     process.env.REDDIT_SAVED_DB = join(tempDir, "test.db");
   });
 

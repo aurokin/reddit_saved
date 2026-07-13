@@ -8,7 +8,7 @@ import { deriveInboxType, syncInbox } from "../src/sync/inbox-sync";
 import type { RedditItem } from "../src/types";
 
 function makeTempDb(): string {
-  const dir = mkdtempSync(join(tmpdir(), "reddit-saved-inbox-sync-"));
+  const dir = mkdtempSync(join(tmpdir(), "reddit-cached-inbox-sync-"));
   return join(dir, "test.db");
 }
 

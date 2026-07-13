@@ -13,7 +13,7 @@ import {
   readJobLock,
   syncContext,
   syncInbox,
-} from "@reddit-saved/core";
+} from "@reddit-cached/core";
 import { flagBool, flagInt, flagStr } from "../args";
 import { type CliContext, createContext } from "../context";
 import {

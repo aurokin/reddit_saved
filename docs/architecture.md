@@ -1,10 +1,10 @@
-# Reddit Saved Architecture
+# Reddit Cached Architecture
 
 ## Read This First
 
 ### Product in one sentence
 
-Reddit Saved is a local-first archive for Reddit content: fetch once, cache in
+Reddit Cached is a local-first archive for Reddit content: fetch once, cache in
 SQLite, then browse, search, tag, export, and selectively unsave against the
 local database instead of repeatedly hitting Reddit's slow paginated API.
 

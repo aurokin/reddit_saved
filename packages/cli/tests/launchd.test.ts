@@ -35,9 +35,9 @@ describe("resolveJobsProgramArguments", () => {
     },
     {
       name: "compiled binary drops the main path",
-      execPath: "/usr/local/bin/reddit-saved",
-      mainPath: "/$bunfs/root/reddit-saved",
-      expected: ["/usr/local/bin/reddit-saved", "jobs", "run", "--trigger", "launchd"],
+      execPath: "/usr/local/bin/reddit-cached",
+      mainPath: "/$bunfs/root/reddit-cached",
+      expected: ["/usr/local/bin/reddit-cached", "jobs", "run", "--trigger", "launchd"],
     },
     {
       name: "steps are appended as a comma list",

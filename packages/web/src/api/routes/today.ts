@@ -2,7 +2,7 @@
  * Today route — deterministic "what's new" digest for the dashboard.
  * Same builder the CLI `today` command uses; no AI, no network.
  */
-import { buildTodayDigest, renderTodayDigest } from "@reddit-saved/core";
+import { buildTodayDigest, renderTodayDigest } from "@reddit-cached/core";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { getAppContext } from "../context";

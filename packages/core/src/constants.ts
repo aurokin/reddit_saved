@@ -5,7 +5,7 @@ import type { ContentOrigin, FilterSettings, PostType } from "./types";
 // ============================================================================
 
 export const VERSION = "0.1.0";
-export const USER_AGENT_TEMPLATE = "bun:reddit-saved:v{version} (by /u/{username})";
+export const USER_AGENT_TEMPLATE = "bun:reddit-cached:v{version} (by /u/{username})";
 
 // ============================================================================
 // OAuth Configuration

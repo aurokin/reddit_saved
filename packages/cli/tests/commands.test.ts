@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { SqliteAdapter, TagManager } from "@reddit-saved/core";
+import { SqliteAdapter, TagManager } from "@reddit-cached/core";
 import { setOutputMode } from "../src/output";
 import { ExitCaptured, captureConsole, captureExit, makeItem, makeTempDb } from "./helpers";
 

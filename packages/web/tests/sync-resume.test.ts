@@ -11,7 +11,7 @@ import {
   type RedditItem,
   SyncStateManager,
   getCheckpointPathForDatabase,
-} from "@reddit-saved/core";
+} from "@reddit-cached/core";
 
 function makeItem(id: string): RedditItem {
   return {
@@ -56,7 +56,7 @@ describe("sync route checkpoint recovery", () => {
   }
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), "reddit-saved-web-sync-resume-"));
+    tempDir = mkdtempSync(join(tmpdir(), "reddit-cached-web-sync-resume-"));
     process.env.XDG_DATA_HOME = join(tempDir, "data");
     bootApp(join(tempDir, "test.db"));
     originalFetchSaved = RedditApiClient.prototype.fetchSaved;

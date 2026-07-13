@@ -111,7 +111,7 @@ describe("quality filters", () => {
   let adapter: SqliteAdapter;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "reddit-saved-quality-"));
+    dir = mkdtempSync(join(tmpdir(), "reddit-cached-quality-"));
     adapter = new SqliteAdapter(join(dir, "test.db"));
     adapter.upsertPosts(
       FIXTURES.map((f) => f.item),

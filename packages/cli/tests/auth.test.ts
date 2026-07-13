@@ -31,7 +31,7 @@ describe("auth status", () => {
   beforeEach(() => {
     tempDir = join(tmpdir(), `cli-auth-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(tempDir, { recursive: true });
-    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-saved");
+    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-cached");
     setOutputMode(false, false, false);
   });
 
@@ -63,7 +63,7 @@ describe("auth status", () => {
   });
 
   test("ignores web session files when reporting OAuth status", async () => {
-    const configDir = join(tempDir, "reddit-saved");
+    const configDir = join(tempDir, "reddit-cached");
     mkdirSync(configDir, { recursive: true });
     writeFileSync(
       join(configDir, "session.json"),
@@ -89,7 +89,7 @@ describe("auth status", () => {
   });
 
   test("shows authenticated with token info", async () => {
-    const configDir = join(tempDir, "reddit-saved");
+    const configDir = join(tempDir, "reddit-cached");
     mkdirSync(configDir, { recursive: true });
     const expiry = Date.now() + 3600_000;
     writeFileSync(
@@ -120,7 +120,7 @@ describe("auth status", () => {
   });
 
   test("shows expired token status", async () => {
-    const configDir = join(tempDir, "reddit-saved");
+    const configDir = join(tempDir, "reddit-cached");
     mkdirSync(configDir, { recursive: true });
     writeFileSync(
       join(configDir, "auth.json"),
@@ -149,7 +149,7 @@ describe("auth status", () => {
   });
 
   test("shows authenticated status even when REDDIT_CLIENT_SECRET is unset", async () => {
-    const configDir = join(tempDir, "reddit-saved");
+    const configDir = join(tempDir, "reddit-cached");
     mkdirSync(configDir, { recursive: true });
     writeFileSync(
       join(configDir, "auth.json"),
@@ -183,7 +183,7 @@ describe("auth logout", () => {
   beforeEach(() => {
     tempDir = join(tmpdir(), `cli-auth-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(tempDir, { recursive: true });
-    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-saved");
+    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-cached");
     setOutputMode(false, false, false);
   });
 
@@ -210,7 +210,7 @@ describe("auth logout", () => {
   });
 
   test("clears OAuth auth only and leaves web session files untouched", async () => {
-    const configDir = join(tempDir, "reddit-saved");
+    const configDir = join(tempDir, "reddit-cached");
     mkdirSync(configDir, { recursive: true });
     const authPath = join(configDir, "auth.json");
     const sessionPath = join(configDir, "session.json");
@@ -265,7 +265,7 @@ describe("auth login", () => {
   beforeEach(() => {
     tempDir = join(tmpdir(), `cli-auth-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(tempDir, { recursive: true });
-    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-saved");
+    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-cached");
     setOutputMode(false, false, false);
   });
 
@@ -393,7 +393,7 @@ describe("auth login", () => {
     }) as typeof fetch;
 
     // Use startOAuthServer directly so we can control the port
-    const { startOAuthServer } = await import("@reddit-saved/core");
+    const { startOAuthServer } = await import("@reddit-cached/core");
 
     // Use a random high port to avoid conflict
     const port = 19638 + Math.floor(Math.random() * 1000);
@@ -426,7 +426,7 @@ describe("auth login", () => {
     await handle.done;
 
     // Verify auth.json was written
-    const authJsonPath = join(tempDir, "reddit-saved", "auth.json");
+    const authJsonPath = join(tempDir, "reddit-cached", "auth.json");
     expect(existsSync(authJsonPath)).toBe(true);
     const authData = JSON.parse(await Bun.file(authJsonPath).text());
     expect(authData.username).toBe("oauth_testuser");
@@ -538,7 +538,7 @@ describe("auth login", () => {
     expect(output.authenticated).toBe(true);
 
     // Verify auth.json was written with correct data
-    const authJsonPath = join(tempDir, "reddit-saved", "auth.json");
+    const authJsonPath = join(tempDir, "reddit-cached", "auth.json");
     expect(existsSync(authJsonPath)).toBe(true);
     const authData = JSON.parse(await Bun.file(authJsonPath).text());
     expect(authData.username).toBe("flaguser");
@@ -630,7 +630,7 @@ describe("auth login", () => {
       restoreFetch();
     }
 
-    const authJsonPath = join(tempDir, "reddit-saved", "auth.json");
+    const authJsonPath = join(tempDir, "reddit-cached", "auth.json");
     const authData = JSON.parse(await Bun.file(authJsonPath).text());
     expect(authData.username).toBe("openeduser");
     expect(authData.accessToken).toBe("opened-access-token");
@@ -647,7 +647,7 @@ describe("auth status — human mode", () => {
   beforeEach(() => {
     tempDir = join(tmpdir(), `cli-auth-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(tempDir, { recursive: true });
-    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-saved");
+    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-cached");
     setOutputMode(true, false, false);
   });
 
@@ -677,7 +677,7 @@ describe("auth status — human mode", () => {
   });
 
   test("shows human-readable auth section when authenticated", async () => {
-    const configDir = join(tempDir, "reddit-saved");
+    const configDir = join(tempDir, "reddit-cached");
     mkdirSync(configDir, { recursive: true });
     writeFileSync(
       join(configDir, "auth.json"),
@@ -711,7 +711,7 @@ describe("auth logout — human mode", () => {
   beforeEach(() => {
     tempDir = join(tmpdir(), `cli-auth-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(tempDir, { recursive: true });
-    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-saved");
+    process.env.REDDIT_SAVED_CONFIG_DIR = join(tempDir, "reddit-cached");
     setOutputMode(true, false, false);
   });
 

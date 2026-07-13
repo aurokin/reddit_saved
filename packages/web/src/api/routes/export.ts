@@ -1,7 +1,7 @@
 /**
  * Export route — streams JSON / CSV / Markdown for the current DB (optionally filtered).
  */
-import { exportToCsv, exportToJson, exportToMarkdown } from "@reddit-saved/core";
+import { exportToCsv, exportToJson, exportToMarkdown } from "@reddit-cached/core";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { getAppContext } from "../context";
@@ -43,19 +43,19 @@ app.get("/", (c) => {
   if (format === "json") {
     const body = exportToJson(ctx.storage, opts);
     c.header("Content-Type", "application/json");
-    c.header("Content-Disposition", `attachment; filename="reddit-saved-${ts}.json"`);
+    c.header("Content-Disposition", `attachment; filename="reddit-cached-${ts}.json"`);
     return c.body(body);
   }
   if (format === "csv") {
     const body = exportToCsv(ctx.storage, opts);
     c.header("Content-Type", "text/csv");
-    c.header("Content-Disposition", `attachment; filename="reddit-saved-${ts}.csv"`);
+    c.header("Content-Disposition", `attachment; filename="reddit-cached-${ts}.csv"`);
     return c.body(body);
   }
   if (format === "markdown" || format === "md") {
     const body = exportToMarkdown(ctx.storage, opts);
     c.header("Content-Type", "text/markdown");
-    c.header("Content-Disposition", `attachment; filename="reddit-saved-${ts}.md"`);
+    c.header("Content-Disposition", `attachment; filename="reddit-cached-${ts}.md"`);
     return c.body(body);
   }
   throw new HTTPException(400, { message: `Unknown format: ${format}` });

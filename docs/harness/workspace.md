@@ -32,7 +32,7 @@ bun run verify
 bun run lint
 bun run typecheck
 bun test
-bun run --filter @reddit-saved/web build
+bun run --filter @reddit-cached/web build
 cd packages/cli && bun run src/index.ts --help
 ```
 
@@ -46,7 +46,7 @@ request to `main`, plus the web e2e smoke suite as a second job.
 | `bun run lint` | Biome lint and formatting rules hold across the workspace |
 | `bun run typecheck` | Cross-package TypeScript surfaces still line up |
 | `bun test` | The shared workspace behavior is intact under the documented test harness |
-| `bun run --filter @reddit-saved/web build` | The web package can build its production SPA bundle |
+| `bun run --filter @reddit-cached/web build` | The web package can build its production SPA bundle |
 | `cd packages/cli && bun run src/index.ts --help` | The CLI entrypoint boots and command wiring is intact |
 
 ## Package-Scoped Probes
@@ -70,7 +70,7 @@ At the current repo snapshot:
 - `bun run verify` passes
 - `bun run typecheck` passes
 - `bun test` passes at the workspace root
-- `bun run --filter @reddit-saved/web build` passes
+- `bun run --filter @reddit-cached/web build` passes
 - `cd packages/cli && bun run src/index.ts --help` passes
 - package-script tests also pass with `bun run --filter '*' test`
 

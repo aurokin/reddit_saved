@@ -7,7 +7,7 @@ node_modules/
 # Build output
 dist/
 *.tgz
-packages/cli/reddit-saved
+packages/cli/reddit-cached
 packages/cli/dist/
 
 # Bun

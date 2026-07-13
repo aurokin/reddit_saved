@@ -48,7 +48,7 @@ describe("JSONL backup", () => {
   let adapter: SqliteAdapter;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "reddit-saved-backup-"));
+    dir = mkdtempSync(join(tmpdir(), "reddit-cached-backup-"));
     dbPath = join(dir, "test.db");
     repoPath = join(dir, "repo");
     adapter = new SqliteAdapter(dbPath);
@@ -176,7 +176,7 @@ describe("backup git integration", () => {
   let adapter: SqliteAdapter;
 
   beforeEach(async () => {
-    dir = mkdtempSync(join(tmpdir(), "reddit-saved-backup-git-"));
+    dir = mkdtempSync(join(tmpdir(), "reddit-cached-backup-git-"));
     dbPath = join(dir, "test.db");
     repoPath = join(dir, "repo");
     adapter = new SqliteAdapter(dbPath);

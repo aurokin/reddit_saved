@@ -16,7 +16,7 @@ import {
   TagManager,
   TokenManager,
   paths,
-} from "@reddit-saved/core";
+} from "@reddit-cached/core";
 import { type AuthMode, selectAuthMode } from "./auth-routing";
 
 export interface SyncCapableAuthProvider extends AuthProvider {

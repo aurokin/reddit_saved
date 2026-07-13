@@ -1,4 +1,4 @@
-import type { ListOptions } from "@reddit-saved/core";
+import type { ListOptions } from "@reddit-cached/core";
 import { flagBool, flagInt, flagStr } from "../args";
 import { createContext } from "../context";
 import {

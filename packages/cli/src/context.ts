@@ -17,7 +17,7 @@ import {
   TagManager,
   TokenManager,
   paths,
-} from "@reddit-saved/core";
+} from "@reddit-cached/core";
 import { clearProgress, printError, printProgress, printVerbose } from "./output";
 
 export interface CliContext {
@@ -73,7 +73,7 @@ export async function createContext(opts: ContextOptions = {}): Promise<CliConte
       }
       if (!settings) {
         printError(
-          "Not authenticated. Connect the browser extension or run 'reddit-saved auth login'.",
+          "Not authenticated. Connect the browser extension or run 'reddit-cached auth login'.",
           "AUTH_REQUIRED",
         );
         storage.close();

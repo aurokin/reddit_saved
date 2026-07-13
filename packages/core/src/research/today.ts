@@ -231,7 +231,7 @@ export function renderTodayDigest(digest: TodayDigest): string {
   // Sync health
   lines.push("## Sync health", "");
   if (digest.syncHealth.length === 0) {
-    lines.push("No sync runs recorded yet — run `reddit-saved fetch --all`.", "");
+    lines.push("No sync runs recorded yet — run `reddit-cached fetch --all`.", "");
   } else {
     for (const origin of digest.syncHealth) {
       const run = origin.lastRun;

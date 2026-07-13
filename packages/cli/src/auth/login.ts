@@ -2,7 +2,7 @@ import {
   DEFAULT_REDIRECT_PORT,
   type OAuthServerHandle,
   startOAuthServer,
-} from "@reddit-saved/core";
+} from "@reddit-cached/core";
 import { flagBool, flagInt } from "../args";
 import { isHumanMode, printError, printInfo, printJson } from "../output";
 

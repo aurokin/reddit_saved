@@ -1,4 +1,4 @@
-import { TokenManager } from "@reddit-saved/core";
+import { TokenManager } from "@reddit-cached/core";
 import { isHumanMode, printInfo, printJson } from "../output";
 
 export async function authLogout(

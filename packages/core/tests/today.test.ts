@@ -10,7 +10,7 @@ const NOW = 1_800_000_000_000; // fixed epoch ms
 const DAY = 24 * 60 * 60 * 1000;
 
 function makeTempDb(): string {
-  const dir = mkdtempSync(join(tmpdir(), "reddit-saved-today-"));
+  const dir = mkdtempSync(join(tmpdir(), "reddit-cached-today-"));
   return join(dir, "test.db");
 }
 

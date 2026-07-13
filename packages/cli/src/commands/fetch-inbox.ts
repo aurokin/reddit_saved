@@ -1,4 +1,4 @@
-import { INBOX_SYNC_DEFAULT_LIMIT, type SyncRunStatus, syncInbox } from "@reddit-saved/core";
+import { INBOX_SYNC_DEFAULT_LIMIT, type SyncRunStatus, syncInbox } from "@reddit-cached/core";
 import { flagInt, flagStr } from "../args";
 import { createContext } from "../context";
 import { clearProgress, isHumanMode, printJson, printProgress, printSection } from "../output";

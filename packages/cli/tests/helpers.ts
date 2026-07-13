@@ -5,7 +5,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AuthSettings, RedditItem, TokenProvider } from "@reddit-saved/core";
+import type { AuthSettings, RedditItem, TokenProvider } from "@reddit-cached/core";
 
 // ---------------------------------------------------------------------------
 // Temp database
