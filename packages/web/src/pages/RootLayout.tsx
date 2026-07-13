@@ -1,13 +1,13 @@
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bookmark, Settings } from "lucide-react";
-import { type ReactNode, Suspense } from "react";
 import { DarkModeToggle } from "@/components/DarkModeToggle";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ErrorState } from "@/components/ErrorState";
 import { SearchBar } from "@/components/SearchBar";
 import { SyncStatus } from "@/components/SyncStatus";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import type { BrowseFilters } from "@/types";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Bookmark, Settings } from "lucide-react";
+import { type ReactNode, Suspense } from "react";
 
 export function RootLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
@@ -39,11 +39,7 @@ export function RootLayout({ children }: { children: ReactNode }) {
           </Link>
 
           <nav className="ml-4 hidden gap-1 text-sm md:flex">
-            <Link
-              to="/"
-              className={navClass(pathname === "/")}
-              data-testid="nav-home"
-            >
+            <Link to="/" className={navClass(pathname === "/")} data-testid="nav-home">
               Home
             </Link>
             <Link
@@ -68,15 +64,13 @@ export function RootLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
         <div className="mx-auto w-full max-w-7xl px-4 pb-2">
-          <SyncStatus showControls={false} />
+          <SyncStatus showControls={false} testId="sync-status-header" />
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
         <ErrorBoundary fallback={(err, reset) => <ErrorState error={err} onRetry={reset} />}>
-          <Suspense fallback={<div className="p-6 text-sm">Loading...</div>}>
-            {children}
-          </Suspense>
+          <Suspense fallback={<div className="p-6 text-sm">Loading...</div>}>{children}</Suspense>
         </ErrorBoundary>
       </main>
 

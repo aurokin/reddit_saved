@@ -1,8 +1,14 @@
-import { Loader2, RefreshCw } from "lucide-react";
 import { useSyncStatus, useSyncStream } from "@/hooks/queries";
+import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "./ui/button";
 
-export function SyncStatus({ showControls = true }: { showControls?: boolean }) {
+export function SyncStatus({
+  showControls = true,
+  testId = "sync-status",
+}: {
+  showControls?: boolean;
+  testId?: string;
+}) {
   const { data, isLoading } = useSyncStatus();
   const stream = useSyncStream();
 
@@ -13,7 +19,7 @@ export function SyncStatus({ showControls = true }: { showControls?: boolean }) 
   return (
     <div
       className="flex items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2 text-sm"
-      data-testid="sync-status"
+      data-testid={testId}
     >
       {running || isLoading ? (
         <Loader2 className="h-4 w-4 animate-spin text-[var(--color-primary)]" />
