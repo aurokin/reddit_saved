@@ -22,6 +22,7 @@ import { fetchCmd } from "./commands/fetch";
 import { fetchContextCmd } from "./commands/fetch-context";
 import { linksRebuildCmd, linksSearchCmd, linksTopCmd } from "./commands/links";
 import { listCmd } from "./commands/list";
+import { researchCmd } from "./commands/research";
 import { searchCmd } from "./commands/search";
 import { statusCmd } from "./commands/status";
 import { unsaveCmd } from "./commands/unsave";
@@ -50,6 +51,7 @@ const COMMANDS: Record<string, CommandHandler> = {
   "fetch context": fetchContextCmd,
   search: searchCmd,
   list: listCmd,
+  research: researchCmd,
   status: statusCmd,
   export: exportCmd,
   unsave: unsaveCmd,
@@ -85,6 +87,8 @@ Commands:
                           --refresh <days> re-captures stale context
   search <query>          Full-text search saved posts
   list                    Browse saved posts with filters
+  research <query>        Deterministic markdown brief from local data
+                          --limit N, --since/--until, --out <file>, --json
   status                  Show database statistics
   export                  Export posts to JSON/CSV/Markdown
   unsave                  Unsave posts on Reddit

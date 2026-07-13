@@ -15,6 +15,7 @@ reddit-saved fetch [--full] [--type saved|upvoted|submitted|comments | --all] [-
 reddit-saved fetch context [--limit N] [--top-comments N] [--refresh <days>]
 reddit-saved search <query> [filters...]
 reddit-saved list [filters...]
+reddit-saved research <query> [--limit N] [--since d] [--until d] [--out f.md] [--json]
 reddit-saved export [--format json|csv|markdown] [filters...]
 reddit-saved status
 reddit-saved unsave [selectors...] [--dry-run] --confirm
@@ -53,6 +54,11 @@ reddit-saved backup status
   params). It is maintained automatically during fetches; `links rebuild`
   regenerates it from the posts table. `--window` accepts `90d`, `12w`, `6m`,
   `1y`.
+- `research` renders a deterministic markdown brief entirely from local data:
+  FTS seed matches (low-quality rows excluded), the stored thread around each
+  seed (including captured context), outbound links, and subreddit counts.
+  No AI, no network, no timestamps — identical database state renders an
+  identical brief. Run `fetch context` first for richer threads.
 - `backup` writes deterministic JSONL (posts sharded by UTC year, plus tags,
   post_tags, and sync_state; derived tables excluded) into a git repository
   configured in `<configDir>/config.json`. Output is byte-identical for the

@@ -240,6 +240,10 @@ export {
 } from "./filters/quality";
 export type { QualityReason } from "./filters/quality";
 
+// Research
+export { buildResearchBrief, renderResearchBrief } from "./research/brief";
+export type { ResearchBrief, ResearchOptions, ResearchSeed } from "./research/brief";
+
 // Monitor
 export { PerformanceMonitor, formatDuration, formatBytes } from "./monitor/performance";
 

@@ -35,6 +35,7 @@ const COMMAND_WORDS = new Set([
   "tag",
   "links",
   "backup",
+  "research",
   "create",
   "rename",
   "delete",
@@ -72,6 +73,7 @@ const BOOLEAN_FLAGS = new Set([
   "exclude-reddit",
   "push",
   "no-git",
+  "json",
 ]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
