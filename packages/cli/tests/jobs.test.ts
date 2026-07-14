@@ -206,6 +206,46 @@ describe("jobs run command", () => {
     const { output } = await runJobs({ steps: "context" });
     expect(output.status).toBe("complete");
   });
+
+  test("unauthenticated run records an errored job run and releases the lock", async () => {
+    rmSync(join(tempDir, "reddit-cached", "auth.json"));
+    // Real API methods throw "Not authenticated" at ensureValid, before any
+    // network — the run must survive to write provenance, not exit early.
+    Object.assign(RedditApiClient.prototype, originalMethods);
+
+    const { output } = await runJobs({ steps: "fetch,inbox,backup" });
+
+    expect(output.status).toBe("errored");
+    expect(process.exitCode).toBe(1);
+    const fetchStep = output.steps.find((s) => s.step === "fetch");
+    expect(fetchStep?.ok).toBe(false);
+    expect(fetchStep?.error).toContain("Not authenticated");
+    const inboxStep = output.steps.find((s) => s.step === "inbox");
+    expect(inboxStep?.ok).toBe(false);
+    expect(inboxStep?.error).toContain("Not authenticated");
+    expect(output.steps.find((s) => s.step === "backup")?.ok).toBe(true);
+
+    const adapter = new SqliteAdapter(dbPath);
+    try {
+      expect(adapter.getJobRunSummaries()[0].status).toBe("errored");
+    } finally {
+      adapter.close();
+    }
+
+    // Lock was released despite the auth failure — the next run proceeds.
+    const again = await runJobs({ steps: "backup" });
+    expect(again.output.status).toBe("complete");
+  });
+
+  test("backup-only run completes without any authentication", async () => {
+    rmSync(join(tempDir, "reddit-cached", "auth.json"));
+    Object.assign(RedditApiClient.prototype, originalMethods);
+
+    const { output } = await runJobs({ steps: "backup" });
+
+    expect(output.status).toBe("complete");
+    expect(output.steps[0].skipped).toBe("not-configured");
+  });
 });
 
 describe("jobs status command", () => {

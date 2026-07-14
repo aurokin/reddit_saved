@@ -27,6 +27,9 @@ export interface CliContext {
   apiClient?: RedditApiClient;
   queue?: RequestQueue;
   monitor: PerformanceMonitor;
+  /** Set when auth was requested: false means no session and no OAuth
+   *  credentials were found (only reachable with optionalAuth). */
+  authAvailable?: boolean;
   close: () => void;
 }
 
@@ -35,6 +38,10 @@ export interface ContextOptions {
   needsAuth?: boolean;
   /** Require API client — implies needsAuth */
   needsApi?: boolean;
+  /** With needsApi: don't exit when unauthenticated — API calls will throw
+   *  instead, so callers that record provenance (jobs run) can capture the
+   *  auth failure per step rather than dying before writing anything. */
+  optionalAuth?: boolean;
   /** Override database path (from --db flag) */
   dbPath?: string;
 }
@@ -52,8 +59,10 @@ export async function createContext(opts: ContextOptions = {}): Promise<CliConte
   // priority — it represents an explicit choice to install the companion
   // extension. OAuth auth.json remains the fallback.
   let authProvider: AuthProvider = tokenManager;
+  let authAvailable: boolean | undefined;
 
   if (needsAuth) {
+    authAvailable = true;
     const sessionManager = new SessionManager();
     try {
       await sessionManager.load();
@@ -72,12 +81,15 @@ export async function createContext(opts: ContextOptions = {}): Promise<CliConte
         throw err;
       }
       if (!settings) {
-        printError(
-          "Not authenticated. Connect the browser extension or run 'reddit-cached auth login'.",
-          "AUTH_REQUIRED",
-        );
-        storage.close();
-        process.exit(2);
+        if (!opts.optionalAuth) {
+          printError(
+            "Not authenticated. Connect the browser extension or run 'reddit-cached auth login'.",
+            "AUTH_REQUIRED",
+          );
+          storage.close();
+          process.exit(2);
+        }
+        authAvailable = false;
       }
     }
   }
@@ -116,6 +128,7 @@ export async function createContext(opts: ContextOptions = {}): Promise<CliConte
     apiClient,
     queue,
     monitor,
+    authAvailable,
     close: () => {
       clearProgress();
       storage.close();

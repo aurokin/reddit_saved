@@ -82,7 +82,10 @@ export async function jobsRunCmd(
   }
 
   try {
-    const ctx = await createContext({ needsApi: true, dbPath });
+    // optionalAuth: an expired/missing session must not kill the run before
+    // provenance is written — API steps fail per-step and the run records
+    // "errored", which is what surfaces the breakage next time the app opens.
+    const ctx = await createContext({ needsApi: true, optionalAuth: true, dbPath });
     try {
       const runId = ctx.storage.startJobRun(trigger);
       const results: JobStepResult[] = [];
@@ -135,6 +138,15 @@ async function runJobStep(
   opts: { limit?: number; dbPath?: string },
 ): Promise<Omit<JobStepResult, "step" | "durationMs">> {
   const api = ctx.apiClient as NonNullable<typeof ctx.apiClient>;
+
+  // Backup is the only step that never talks to Reddit. The rest fail here
+  // when no credentials exist, so the run records a clear per-step error
+  // instead of burning API retries on a missing session.
+  if (step !== "backup" && ctx.authAvailable === false) {
+    throw new Error(
+      "Not authenticated. Connect the browser extension or run 'reddit-cached auth login'.",
+    );
+  }
 
   switch (step) {
     case "fetch": {
