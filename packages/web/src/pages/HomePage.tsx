@@ -62,8 +62,8 @@ export function HomePage() {
           className="rounded-md border border-amber-500/60 bg-card px-3 py-2 text-sm text-amber-700 dark:text-amber-400"
           data-testid="full-sync-callout"
         >
-          No origin has completed a full sync yet — run one per origin below so orphan detection has
-          a baseline to compare against.
+          You haven't run a full sync yet. Use the Full sync buttons below so Reddit Cached can tell
+          when items disappear from Reddit.
         </p>
       ) : null}
 

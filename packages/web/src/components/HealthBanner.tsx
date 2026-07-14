@@ -6,6 +6,14 @@ import { useState } from "react";
 
 const STORAGE_KEY = "health-banner-dismissed";
 
+/** Human labels for pipeline step ids (see JOB_STEPS in the CLI). */
+const STEP_LABELS: Record<string, string> = {
+  fetch: "fetching posts",
+  context: "thread context",
+  inbox: "inbox",
+  backup: "git backup",
+};
+
 function readDismissed(): string | null {
   try {
     return sessionStorage.getItem(STORAGE_KEY);
@@ -33,11 +41,11 @@ export function HealthBanner() {
 
   // Highest severity first: a broken session means every future scheduled
   // sync fails, an errored run is a symptom that may already be resolved.
-  // TEST_MODE stubs auth, so session state is meaningless there.
-  const sessionProblem =
-    auth.data !== undefined &&
-    !testMode &&
-    (session.data?.blocked === true || (auth.data.authenticated === false && hasData));
+  // TEST_MODE stubs auth, so every condition is suppressed there to keep the
+  // e2e seed deterministic.
+  const ready = auth.data !== undefined && !testMode;
+  const sessionBlocked = ready && session.data?.blocked === true;
+  const sessionExpired = ready && !sessionBlocked && auth.data?.authenticated === false && hasData;
 
   const lastJob = jobs.data?.items?.[0];
   const jobErrored = lastJob?.status === "errored";
@@ -48,21 +56,31 @@ export function HealthBanner() {
   let linkTo: "/login" | "/settings";
   let linkLabel: string;
 
-  if (sessionProblem) {
-    key = "session";
-    destructive = true;
-    message =
-      "Your Reddit session is disconnected, so scheduled syncs are failing. " +
-      "Open reddit.com signed in with the companion extension, or reconnect below.";
+  if (sessionBlocked) {
+    // Deliberately disconnected: while blocked, forwarded sessions are
+    // rejected, so browsing reddit.com cannot fix it — only Reconnect can.
+    key = "session-blocked";
+    destructive = false;
+    message = "Syncing is disconnected — scheduled syncs are paused until you reconnect.";
     linkTo = "/login";
     linkLabel = "Reconnect";
-  } else if (jobErrored && lastJob) {
-    const failedSteps = lastJob.steps.filter((s) => !s.ok).map((s) => s.step);
+  } else if (sessionExpired) {
+    key = "session-expired";
+    destructive = true;
+    message =
+      "Your Reddit session expired, so scheduled syncs are failing. " +
+      "Browse reddit.com while signed in and the extension will reconnect automatically, or use Reconnect.";
+    linkTo = "/login";
+    linkLabel = "Reconnect";
+  } else if (ready && jobErrored && lastJob) {
+    const failedSteps = lastJob.steps
+      .filter((s) => !s.ok)
+      .map((s) => STEP_LABELS[s.step] ?? s.step);
     const failedPart = failedSteps.length > 0 ? ` (failed steps: ${failedSteps.join(", ")})` : "";
     const when = formatRelative(Math.floor((lastJob.finishedAt ?? lastJob.startedAt) / 1000));
     key = `job-${lastJob.id}`;
     destructive = false;
-    message = `The last scheduled sync failed ${when}${failedPart}. Your archive is safe — syncs will resume once the session is restored.`;
+    message = `The last scheduled sync failed ${when}${failedPart}. Your archive is safe — the next scheduled run will retry.`;
     linkTo = "/settings";
     linkLabel = "Scheduled jobs";
   } else {

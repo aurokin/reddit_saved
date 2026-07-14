@@ -103,25 +103,26 @@ describe("HealthBanner", () => {
     expect(screen.queryByTestId("health-banner")).toBeNull();
   });
 
-  test("shows the session warning when the session is blocked", async () => {
+  test("shows the paused warning when the session is deliberately blocked", async () => {
     mockApi({ blocked: true });
     renderWithProviders(<HealthBanner />);
 
     await waitFor(() => expect(screen.getByTestId("health-banner")).toBeTruthy());
-    expect(screen.getByTestId("health-banner").textContent).toContain(
-      "Your Reddit session is disconnected",
-    );
+    expect(screen.getByTestId("health-banner").textContent).toContain("scheduled syncs are paused");
+    // Blocked rejects forwarded sessions, so the copy must not suggest
+    // browsing reddit.com — Reconnect is the only way out.
+    expect(screen.getByTestId("health-banner").textContent).not.toContain("reddit.com");
     expect(screen.getByText("Reconnect")).toBeTruthy();
   });
 
-  test("shows the session warning when unauthenticated with data in the archive", async () => {
+  test("shows the expired warning when unauthenticated with data in the archive", async () => {
     mockApi({ authenticated: false, totalPosts: 10 });
     renderWithProviders(<HealthBanner />);
 
     await waitFor(() => expect(screen.getByTestId("health-banner")).toBeTruthy());
-    expect(screen.getByTestId("health-banner").textContent).toContain(
-      "scheduled syncs are failing",
-    );
+    const text = screen.getByTestId("health-banner").textContent ?? "";
+    expect(text).toContain("scheduled syncs are failing");
+    expect(text).toContain("Browse reddit.com");
   });
 
   test("stays hidden when unauthenticated but the archive is empty", async () => {
@@ -149,8 +150,11 @@ describe("HealthBanner", () => {
 
     await waitFor(() => expect(screen.getByTestId("health-banner")).toBeTruthy());
     const text = screen.getByTestId("health-banner").textContent ?? "";
-    expect(text).toContain("failed steps: fetch");
+    // Step ids are mapped to human labels, never shown raw.
+    expect(text).toContain("failed steps: fetching posts");
     expect(text).toContain("Your archive is safe");
+    // A non-session failure must not blame the session.
+    expect(text).not.toContain("session is restored");
     expect(screen.getByText("Scheduled jobs")).toBeTruthy();
   });
 
@@ -162,9 +166,7 @@ describe("HealthBanner", () => {
     renderWithProviders(<HealthBanner />);
 
     await waitFor(() => expect(screen.getByTestId("health-banner")).toBeTruthy());
-    expect(screen.getByTestId("health-banner").textContent).toContain(
-      "Your Reddit session is disconnected",
-    );
+    expect(screen.getByTestId("health-banner").textContent).toContain("scheduled syncs are paused");
   });
 
   test("dismiss hides the banner for the same failure but a new failure reappears", async () => {

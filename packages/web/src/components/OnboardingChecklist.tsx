@@ -53,17 +53,20 @@ export function OnboardingChecklist() {
         <Button
           size="sm"
           variant="outline"
-          disabled={stream.isRunning}
+          disabled={stream.isRunning || !authenticated}
           onClick={() => stream.start("saved", true)}
           data-testid="onboarding-sync"
         >
-          Full sync saved
+          Sync saved posts
         </Button>
+        {authenticated ? null : (
+          <span className="mt-1 block">Connect Reddit first — this enables once you're in.</span>
+        )}
       </Step>
 
       <Step done={hasJobRuns} title="Schedule hourly syncs" testId="onboarding-step-schedule">
         {hasJobRuns ? (
-          "Scheduled pipeline runs are recorded."
+          "A background sync has run on this machine."
         ) : (
           <>
             Install the background job so the archive updates itself:
@@ -81,13 +84,15 @@ export function OnboardingChecklist() {
         )}
       </Step>
 
-      <Step done={false} title="Optional: git backup" testId="onboarding-step-backup">
-        Mirror the archive into a git repo with{" "}
+      {/* Backup state isn't exposed to the web app, so this is a plain hint
+          rather than a checklist step with a done-circle it could never fill. */}
+      <p className="text-sm text-muted-foreground" data-testid="onboarding-step-backup">
+        Optional: mirror the archive into a git repo with{" "}
         <code className="rounded bg-muted px-1.5 py-0.5">
           reddit-cached backup init --repo ~/backups/reddit-cached
         </code>{" "}
         — after that, the scheduled job keeps it in sync.
-      </Step>
+      </p>
     </Card>
   );
 }

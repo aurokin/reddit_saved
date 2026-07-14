@@ -8,6 +8,7 @@ import { formatRelative } from "@/lib/utils";
 import type { InboxItemType } from "@/types";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { ExternalLink, Inbox } from "lucide-react";
+import { useEffect } from "react";
 
 export interface InboxFilters {
   type?: InboxItemType;
@@ -60,6 +61,24 @@ export function InboxPage() {
   const total = inbox.data?.total ?? 0;
   const rangeStart = total === 0 ? 0 : offset + 1;
   const rangeEnd = offset + (inbox.data?.items.length ?? 0);
+
+  // An out-of-range page (stale bookmark, or items pruned by a sync while
+  // paginated) would render a misleading empty state and a nonsense range —
+  // clamp back to the last page that has items.
+  const outOfRange = inbox.data !== undefined && total > 0 && offset >= total;
+  useEffect(() => {
+    if (!outOfRange) return;
+    const lastPage = Math.ceil(total / PAGE_SIZE);
+    void navigate({
+      to: "/inbox",
+      search: {
+        type: search.type,
+        unread: search.unread ? true : undefined,
+        page: lastPage > 1 ? lastPage : undefined,
+      },
+      replace: true,
+    });
+  }, [outOfRange, total, navigate, search.type, search.unread]);
 
   return (
     <div className="flex flex-col gap-4" data-testid="inbox-page">
@@ -173,6 +192,12 @@ export function InboxPage() {
             );
           })}
         </div>
+      ) : outOfRange ? (
+        // Items exist on earlier pages; the clamp effect above is redirecting.
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+        </div>
       ) : (
         <EmptyState
           icon={<Inbox className="h-8 w-8" />}
@@ -181,7 +206,7 @@ export function InboxPage() {
         />
       )}
 
-      {inbox.data && total > 0 ? (
+      {inbox.data && total > 0 && !outOfRange ? (
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span data-testid="inbox-range">
             {rangeStart}–{rangeEnd} of {total}

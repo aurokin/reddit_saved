@@ -176,6 +176,19 @@ describe("InboxPage", () => {
     await waitFor(() => expect(screen.getByTestId("inbox-range").textContent).toBe("1–50 of 60"));
   });
 
+  test("clamps an out-of-range page back to the last page with items", async () => {
+    const items = Array.from({ length: 10 }, (_, i) => makeItem(`cl${i}`));
+    mockApi(items);
+    renderInboxPage("/inbox?page=3");
+
+    // All 10 items fit on page 1, so ?page=3 gets replaced with page 1 —
+    // never the misleading "Inbox is empty" state or a "101–100 of 10" range.
+    await waitFor(() => expect(currentRouter?.state.location.search).toEqual({}));
+    await waitFor(() => expect(screen.getAllByTestId("inbox-row")).toHaveLength(10));
+    expect(screen.getByTestId("inbox-range").textContent).toBe("1–10 of 10");
+    expect(screen.queryByText("Inbox is empty")).toBeNull();
+  });
+
   test("hides pagination controls when the inbox is empty", async () => {
     mockApi([]);
     renderInboxPage();

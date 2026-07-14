@@ -92,7 +92,8 @@ describe("OnboardingChecklist", () => {
     expect(stepDone("onboarding-step-connect")).toBe(false);
     expect(stepDone("onboarding-step-sync")).toBe(false);
     expect(stepDone("onboarding-step-schedule")).toBe(false);
-    expect(stepDone("onboarding-step-backup")).toBe(false);
+    // The sync button is useless before Connect, so it starts disabled.
+    expect((screen.getByTestId("onboarding-sync") as HTMLButtonElement).disabled).toBe(true);
     // Scheduling hints show both platform commands
     expect(screen.getByText("reddit-cached jobs install-launchd")).toBeTruthy();
     expect(screen.getByText("reddit-cached jobs install-systemd")).toBeTruthy();
@@ -105,8 +106,9 @@ describe("OnboardingChecklist", () => {
     await waitFor(() => expect(stepDone("onboarding-step-connect")).toBe(true));
     await waitFor(() => expect(stepDone("onboarding-step-sync")).toBe(true));
     await waitFor(() => expect(stepDone("onboarding-step-schedule")).toBe(true));
-    // Backup has no web-side detection — always shown as an optional hint.
-    expect(stepDone("onboarding-step-backup")).toBe(false);
+    // Backup has no web-side detection — shown as a plain hint, never a
+    // checkbox step that could read as not-done.
+    expect(screen.getByTestId("onboarding-step-backup").getAttribute("data-done")).toBeNull();
     expect(screen.queryByTestId("onboarding-login")).toBeNull();
   });
 

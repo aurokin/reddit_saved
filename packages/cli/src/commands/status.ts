@@ -37,9 +37,11 @@ async function collectWarnings(ctx: CliContext): Promise<string[]> {
   }
 
   if (sessionBlocked) {
+    // While blocked, forwarded sessions are rejected — browsing reddit.com
+    // with the extension cannot fix this, so don't suggest it.
     warnings.push(
-      "Extension session is disconnected, so scheduled syncs are failing. " +
-        "Reconnect from the web app, or open reddit.com signed in with the companion extension.",
+      "Extension session is disconnected, so scheduled syncs are paused. " +
+        "Reconnect from the web app's Settings page.",
     );
   } else if (!sessionAuthenticated) {
     let oauthSettings = null;

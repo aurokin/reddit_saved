@@ -56,8 +56,9 @@ export function SettingsPage() {
         <p className="text-sm text-muted-foreground">
           Reddit Cached signs in with the same browser session you use on reddit.com, forwarded by
           the companion extension — no password is stored here. Reddit occasionally expires that
-          session; when it does, just open reddit.com signed in and the extension re-forwards it
-          automatically. If syncing was disconnected on purpose, use Reconnect below.
+          session; when it does, just browse reddit.com while signed in and the extension
+          re-forwards it automatically. If you disconnect on purpose, a Reconnect button appears
+          here.
         </p>
         {auth.isLoading ? (
           <p className="text-sm">Checking status…</p>
