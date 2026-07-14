@@ -2,6 +2,7 @@
   "name": "@reddit-cached/extension",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "Browser extension that forwards reddit.com session cookies to the local Reddit Cached app.",
   "scripts": {
     "build": "node scripts/build.js",

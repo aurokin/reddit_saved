@@ -1,0 +1,86 @@
+name: Bump Homebrew formula
+
+# Writes Formula/reddit-cached.rb in the aurokin/homebrew-tap repo whenever a
+# release is PUBLISHED. The `published` activity type fires when the operator
+# un-drafts a release — which is exactly our flow: release.yml ships a draft,
+# the operator verifies the tarballs locally, then publishes. Triggering here
+# (not on tag push) guarantees the release assets are public, so SHA256SUMS is
+# fetchable and `brew install`/`brew audit` against the tap will succeed.
+on:
+  release:
+    types: [published]
+
+# This repo only needs read; the cross-repo push to the tap uses a
+# fine-grained PAT (HOMEBREW_TAP_TOKEN) — GITHUB_TOKEN cannot write another repo.
+permissions:
+  contents: read
+
+# Serialize bumps so two rapid publishes can't race the tap's main branch.
+concurrency:
+  group: bump-homebrew
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump tap formula
+    # Stable releases only — gate on BOTH signals. release.yml does not set
+    # `prerelease:` on the draft, so GitHub's prerelease flag can be false even
+    # for an `-rc` tag. The repo's convention is that any `-` in the tag (e.g.
+    # v1.2.3-rc1) marks a prerelease (see release.yml's verify job `${tag%%-*}`
+    # base check), so a hyphenated tag must never move the tap regardless of
+    # the flag.
+    if: ${{ !github.event.release.prerelease && !contains(github.event.release.tag_name, '-') }}
+    runs-on: ubuntu-latest
+    steps:
+      # This repo, at the released tag, for scripts/generate-formula.sh — the
+      # same script that is validated locally against a dist-release manifest.
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Fetch checksums from the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          # The release is published, so its assets are downloadable. Pull the
+          # checksum manifest rather than re-hashing the tarballs — it inherits
+          # the operator's verified artifacts.
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern SHA256SUMS \
+            --output SHA256SUMS
+
+      - name: Checkout tap repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: aurokin/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Render Formula/reddit-cached.rb
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p tap/Formula
+          scripts/generate-formula.sh "$TAG" SHA256SUMS tap/Formula/reddit-cached.rb
+
+      - name: Commit and push to tap
+        working-directory: tap
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/reddit-cached.rb
+          if git diff --cached --quiet; then
+            echo "Formula already up to date for ${version}; nothing to push."
+            exit 0
+          fi
+          git commit -m "reddit-cached ${version}"
+          git push
