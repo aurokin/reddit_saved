@@ -1,4 +1,5 @@
 import { hostname } from "node:os";
+import { dirname } from "node:path";
 
 /**
  * Cross-process job mutex using exclusive file creation (open "wx") — ported
@@ -28,6 +29,10 @@ export async function acquireJobLock(
   const fs = await import("node:fs/promises");
 
   const info: JobLockInfo = { pid: process.pid, host: hostname(), startedAt: Date.now() };
+
+  // On a fresh machine the lock is acquired before anything has created the
+  // data directory (the DB opens after the lock), so ensure it exists.
+  await fs.mkdir(dirname(lockPath), { recursive: true });
 
   try {
     const handle = await fs.open(lockPath, "wx");

@@ -29,6 +29,14 @@ describe("acquireJobLock", () => {
     await release?.();
   });
 
+  test("acquires when the data directory does not exist yet", async () => {
+    const freshPath = join(dir, "data", ".reddit-jobs.lock");
+    const release = await acquireJobLock(freshPath);
+    expect(release).toBeDefined();
+    expect(existsSync(freshPath)).toBe(true);
+    await release?.();
+  });
+
   test("second acquire fails while held", async () => {
     const release = await acquireJobLock(lockPath);
     expect(await acquireJobLock(lockPath)).toBeUndefined();
