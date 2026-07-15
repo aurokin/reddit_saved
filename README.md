@@ -140,12 +140,15 @@ Back the archive up as deterministic JSONL in a git repository — byte-identica
 output for the same database state, so an unchanged sync produces no commit:
 
 ```bash
-reddit-cached backup init --repo ~/backups/reddit --push
-reddit-cached backup sync --push
+reddit-cached backup init --repo ~/backups/reddit
+reddit-cached backup sync
 reddit-cached backup status
 ```
 
 Once configured, the scheduled pipeline runs the backup step automatically.
+Backups are local commits by default; to also push, the repo needs a git
+remote — pass `--remote origin --push` to `backup init` and syncs will push
+after each commit.
 
 ## For agents
 
