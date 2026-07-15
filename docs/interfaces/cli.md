@@ -15,15 +15,15 @@ reddit-cached fetch [--full] [--type saved|upvoted|submitted|comments | --all] [
 reddit-cached fetch context [--limit N] [--top-comments N] [--refresh <days>]
 reddit-cached fetch inbox [--limit N]
 reddit-cached inbox [--type comment_reply|post_reply|mention|message] [--unread] [--limit N]
-reddit-cached search <query> [filters...]
-reddit-cached list [filters...]
+reddit-cached search <query> [filter flags] [--limit N] [--offset N]
+reddit-cached list [filter flags] [--origin <o>] [--sort created|score] [--sort-direction asc|desc] [--limit N] [--offset N]
 reddit-cached research <query> [--limit N] [--since d] [--until d] [--out f.md] [--json]
 reddit-cached today [--window 24h|7d|since-last-job] [--out f.md] [--json]
-reddit-cached export [--format json|csv|markdown] [filters...]
+reddit-cached export [--format json|csv|markdown] [--output <file>] [--include-raw] [filter flags] [--limit N]
 reddit-cached import <dir> [--types saved,upvoted,submitted,commented] [--limit N] [--dry-run]
 reddit-cached status
 reddit-cached serve [--port N]
-reddit-cached unsave [selectors...] [--dry-run] --confirm
+reddit-cached unsave [--id <id,...>] [--subreddit <r>] [--tag <t>] [--orphaned] [--limit N] [--dry-run] --confirm
 reddit-cached tag list|create|rename|delete|add|remove|show
 reddit-cached links top [--window 90d] [--exclude-reddit] [--limit N]
 reddit-cached links search <pattern> [--limit N]
@@ -44,6 +44,16 @@ reddit-cached jobs uninstall-systemd [--unit-name <name>]
 - The CLI is the operator and automation surface over the shared local SQLite
   database.
 - JSON-oriented output is the default shape for composable usage.
+- Filter flags, shared by `search`, `list`, and `export`: `--subreddit <r>`,
+  `--tag <t>`, `--orphaned`, `--type post|comment`, `--hide-low-quality`,
+  `--include-context`; `search` and `list` additionally accept
+  `--author <name>`, `--min-score N`, and `--after`/`--before <date>`. All
+  three take `--limit N` (default 25 for `search`/`list`; `export` is
+  unlimited by default).
+- `unsave` selects items with either `--id` (comma-separated, and additional
+  ids may follow as positionals) or the filter selectors `--subreddit`,
+  `--tag`, `--orphaned` (capped at `--limit`, default 1000) — never both, and
+  bare positionals without `--id` are an error.
 - CLI auth commands manage the legacy OAuth file, `auth.json`. The web app's
   companion-extension session files, `session.json` and `session.blocked.json`,
   are managed from the local web app.
@@ -94,7 +104,8 @@ reddit-cached jobs uninstall-systemd [--unit-name <name>]
   and the last pipeline run. `--window since-last-job` measures from the
   start of the last complete `jobs run`.
 - `backup` writes deterministic JSONL (posts sharded by UTC year, plus tags,
-  post_tags, and sync_state; derived tables excluded) into a git repository
+  post_tags, sync_state, and inbox_items; derived tables excluded) into a git
+  repository
   configured in `<configDir>/config.json`. Output is byte-identical for the
   same database state, so an unchanged sync produces no commit. Commits are
   made with GPG signing disabled; `--push` (or `push: true` in config) pushes

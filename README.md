@@ -56,9 +56,15 @@ curl -fsSL https://raw.githubusercontent.com/aurokin/reddit_cached/main/install.
 # Homebrew
 brew install aurokin/tap/reddit-cached
 
-# npm, if you have Bun (https://bun.sh) installed
+# Try it without installing, if you have Bun (https://bun.sh)
 bunx reddit-cached --help
 ```
+
+Note that `bunx` runs from Bun's cache without putting `reddit-cached` on your
+PATH — prefix the commands below with `bunx` (or `bun install -g reddit-cached`
+for a real command), and set up [scheduled syncs](#scheduled-syncs) from a
+brew/install.sh/tarball binary so the schedule doesn't point into an evictable
+cache.
 
 Or download a platform tarball from the
 [releases page](https://github.com/aurokin/reddit_cached/releases) and verify
@@ -164,9 +170,8 @@ The authoritative command reference is
 ## Development
 
 Requires [Bun](https://bun.sh). From a source checkout you can run the CLI
-directly (`cd packages/cli && bun run src/index.ts`), serve the dashboard
-(`cd packages/web && bun run build && bun run start`), or compile the
-standalone binary:
+directly (`cd packages/cli && bun run src/index.ts`) or compile the standalone
+binary:
 
 ```bash
 git clone https://github.com/aurokin/reddit_cached && cd reddit_cached
@@ -174,22 +179,11 @@ bun install
 bun run build:binary   # emits packages/cli/dist/reddit-cached (CLI + web dashboard)
 ```
 
-Run the whole stack against deterministic fixture data — no Reddit account
-needed:
-
-```bash
-bun install
-bun run --filter @reddit-cached/web seed
-cd packages/web
-TEST_MODE=1 bun run dev
-```
-
-Open `http://localhost:3000`. `TEST_MODE=1` disables real Reddit sync and
-writes. Verify the workspace (lint, typecheck, tests, web build, CLI smoke):
-
-```bash
-bun run verify
-```
+To run the whole stack against deterministic fixture data — no Reddit account
+needed — see the seeded `TEST_MODE` harness in
+[packages/web/README.md](./packages/web/README.md). The workspace verification
+routine (`bun run verify`) is documented in
+[docs/harness/workspace.md](./docs/harness/workspace.md).
 
 ## Docs
 

@@ -10,8 +10,11 @@ This repo uses progressive disclosure documentation:
 
 ### I want to run the app
 
-- Read [packages/web/README.md](../packages/web/README.md) for the local web
-  workflow.
+- Installed the binary (brew, install.sh, tarball, or bunx)? Read the
+  [root README quickstart](../README.md) — install, `reddit-cached serve`,
+  connect, sync, schedule.
+- Read [packages/web/README.md](../packages/web/README.md) for the from-source
+  and development web workflow.
 - Read [packages/extension/README.md](../packages/extension/README.md) if you
   want the companion session-auth extension.
 
@@ -34,6 +37,12 @@ This repo uses progressive disclosure documentation:
 - Read [interfaces/cli.md](./interfaces/cli.md) for the CLI command surface.
 - Read [interfaces/web-api.md](./interfaces/web-api.md) for the local web API
   surface.
+
+### I want to cut a release
+
+- Read [releasing.md](./releasing.md) for the version-bump, tag, draft-verify,
+  and publish flow, including what CI enforces and what happens automatically
+  after publish.
 
 ### I want to know where active work is tracked
 

@@ -5,7 +5,8 @@ Active execution tracking lives in Linear, not in the repo docs.
 ## Source Of Truth
 
 - Project: `Reddit Cached`
-- Current hardening milestone: `Repo Hardening`
+- Current milestone: see the project in Linear (milestone names in repo docs
+  go stale; the project pointer does not)
 
 ## What Belongs In Repo Docs
 

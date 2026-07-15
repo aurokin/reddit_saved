@@ -6,6 +6,12 @@ This package is the local web UI for Reddit Cached. It is not a hosted service:
 the React app and the Hono API run on your machine, talk to the same SQLite
 database as the CLI, and share the same auth files.
 
+End users get this UI through `reddit-cached serve`: the package exports an
+app factory (`./app`, implemented in `src/api/app.ts`) that the CLI consumes,
+and the compiled single-file binary embeds the built SPA assets. The workflows
+below (`bun run dev`, `bun run start`) are the contributor paths from a source
+checkout.
+
 If you need system shape or current implementation status, read:
 
 - [Docs hub](../../docs/README.md)
@@ -75,8 +81,8 @@ bun run test:e2e
 
 | Area | Purpose |
 |---|---|
-| `src/api/` | Hono server, middleware, shared app context, API routes |
-| `src/pages/` | Route-level UI for home, browse, post, settings, login |
+| `src/api/` | Hono server (`app.ts` factory + `static.ts` asset serving), middleware, shared app context, API routes |
+| `src/pages/` | Route-level UI: home dashboard, browse, post, links, inbox, settings, login |
 | `src/components/` | Shared UI components and local primitives |
 | `src/hooks/queries.ts` | React Query hooks and sync stream wiring |
 | `scripts/seed.ts` | Deterministic local data harness |
@@ -140,6 +146,14 @@ It is a hard error to run this mode with `NODE_ENV=production`.
 - web and CLI share the same SQLite database
 - tags are local-only
 - orphaned rows stay searchable and exportable
+
+### Health and empty states
+
+- the root layout renders a `HealthBanner` with derived warnings (failed
+  pipeline steps, disconnected session) — the same warnings the CLI `status`
+  command reports
+- the home dashboard swaps to an onboarding checklist when the archive is
+  empty
 
 ## Troubleshooting
 

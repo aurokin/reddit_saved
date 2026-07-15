@@ -29,9 +29,10 @@ the same SQLite database, auth files, and sync machinery.
 - Vite + React 19 SPA
 - Hono API on `Bun.serve()`
 - Shared SQLite/auth/core integration
-- Browse, post detail, settings, login, and home routes
+- Home dashboard, browse, post detail, links, inbox, settings, and login routes
 - Sync progress over SSE
-- Seed script and Playwright smoke coverage
+- Seed script and Playwright smoke coverage (dashboard, links, inbox, and
+  mobile-viewport flows included)
 
 ### What is still weakly proved
 
@@ -90,6 +91,10 @@ Routes currently in play:
   endpoints
 - Posts: `/api/posts`, `/api/posts/search`, `/api/posts/:id`
 - Tags: `/api/tags`, `/api/posts/:id/tags`
+- Links: `/api/links`, `/api/links/search`
+- Today: `/api/today`
+- Inbox: `/api/inbox`
+- Jobs: `/api/jobs`
 - Sync: `/api/sync/status`, `/api/sync/fetch`, `/api/sync/cancel`
 - Actions: `/api/unsave`, `/api/export`, `/api/health`
 
@@ -105,11 +110,16 @@ Route expectations:
 
 | Route | Job |
 |---|---|
-| `/` | high-level status, recent items, tag links |
+| `/` | dashboard: activity overview, today strip, inbox preview, top links, sync health, context progress; swaps to an onboarding checklist on an empty archive |
 | `/browse` | filter, search, paginate, virtualized list |
 | `/post/:id` | detail view, media, tags, confirm-gated unsave |
+| `/links` | outbound link index: top links and pattern search |
+| `/inbox` | cached inbox: replies, mentions, messages, unread first |
 | `/settings` | auth state, sync state, exports, tag management |
 | `/login` | auth handoff and reconnect entry point |
+
+A `HealthBanner` in the root layout surfaces the same derived warnings the CLI
+`status` command reports.
 
 ### 4. Sync harness
 
@@ -148,7 +158,20 @@ The harness passes when:
 - non-`/api/*` routes fall back to `dist/index.html`
 - `TEST_MODE` is rejected under `NODE_ENV=production`
 
-### 6. Test harness
+### 6. Binary harness
+
+Purpose: prove the consumer-facing production path — the compiled single-file
+binary with the SPA embedded, run as `reddit-cached serve`.
+
+- `packages/cli/scripts/smoke-binary.sh` boots the binary against a temp
+  database and checks CLI commands plus `serve` (API and embedded SPA both
+  respond).
+- CI's `binary` job runs `bun run build:binary` and then the smoke script on
+  every push and pull request.
+- The release workflow extracts the linux-amd64 tarball and runs the same
+  smoke script against the actual release asset, not a rebuild.
+
+### 7. Test harness
 
 Purpose: keep the web package change-safe.
 

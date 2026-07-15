@@ -17,11 +17,16 @@ talks to anything besides reddit.com (read) and the loopback address (write).
 
 ## Install (Chrome / Edge / Brave)
 
-1. Open `chrome://extensions`.
-2. Toggle **Developer mode** (top right).
-3. Click **Load unpacked**.
-4. Select the `packages/extension` directory.
-5. Make sure you're logged in to reddit.com — click the extension's icon to
+1. Download `reddit-cached-extension.zip` from the
+   [releases page](https://github.com/aurokin/reddit_cached/releases) and
+   unzip it to a permanent location (Chrome loads it from that folder, so
+   don't delete it). From a source checkout, skip the download and use the
+   `packages/extension` directory instead.
+2. Open `chrome://extensions`.
+3. Toggle **Developer mode** (top right).
+4. Click **Load unpacked**.
+5. Select the unzipped folder (or `packages/extension`).
+6. Make sure you're logged in to reddit.com — click the extension's icon to
    confirm "Connected".
 
 ## Install (Firefox)
@@ -47,6 +52,8 @@ For a permanent install in regular Firefox, you'd need to sign the extension via
 - `storage` — to remember the last sync state for the popup display.
 - `alarms` — for the 30-minute heartbeat re-sync, retry backoff, and durable
   cookie-change wakeups in MV3.
+- `activeTab` — declared in both manifests but currently unused by any shipped
+  code; flagged for removal.
 
 The extension has no other host permissions and does not request `tabs`,
 `webRequest`, or browsing history access.
@@ -64,4 +71,6 @@ it — read `background.js` first.
 - `manifest.firefox.json` — Firefox MV3 background-script variant used by the build.
 - `scripts/build.js` — generates `dist/chrome/` and `dist/firefox/` with the right manifest.
 - `background.js` — cookie listener, `/api/me.json` fetch, POST to local app.
+- `cookies.js` — cookie-jar helpers.
+- `app-config.js` — validation and storage of the configurable local app base URL.
 - `popup.html` / `popup.js` — small status panel and "Sync now" button.

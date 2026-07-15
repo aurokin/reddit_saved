@@ -10,7 +10,7 @@ machinery.
 
 | Area | Routes |
 |---|---|
-| Auth | `/api/auth/status`, `/api/auth/login`, `/api/auth/logout`, session endpoints |
+| Auth | `/api/auth/status`, `POST /api/auth/login`, `POST /api/auth/logout`, `POST/GET/DELETE /api/auth/session`, `POST /api/auth/session/clear`, `POST /api/auth/session/reconnect` |
 | Posts | `/api/posts`, `/api/posts/search`, `/api/posts/:id`, post tag mutations |
 | Tags | `/api/tags` CRUD |
 | Links | `/api/links` (top links; `since`, `excludeReddit`, `limit`), `/api/links/search?q=` |
@@ -23,5 +23,8 @@ machinery.
 ## Notes
 
 - The API is intentionally thin and delegates domain behavior to `packages/core`.
+- `POST /api/auth/session` is the browser extension's cookie-forwarding
+  ingestion endpoint; it rejects with `401 SESSION_INVALID` or
+  `409 SESSION_BLOCKED`.
 - Sync progress is streamed over SSE.
 - Non-`/api/*` routes belong to the SPA, not the API layer.

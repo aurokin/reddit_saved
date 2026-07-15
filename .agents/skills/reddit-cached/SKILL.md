@@ -7,7 +7,8 @@ description: "Search and analyze the user's Reddit saved/upvoted/submitted/comme
 
 Use this for questions about the user's Reddit content before any live Reddit
 lookup. The archive is a local SQLite cache; every command below is offline
-except `fetch`.
+except the sync commands — `fetch`, `import` (without `--dry-run`), `unsave`,
+and `jobs run`.
 
 ## Data
 
@@ -32,7 +33,7 @@ provenance), and `resumeCursors`. All commands emit JSON by default; pass
 
 - **Single fact / find one post** → `reddit-cached search "<query>"` (FTS5 over
   title/selftext/body/subreddit/author/flair/url). Add `--subreddit`,
-  `--author`, `--min-score`, `--after`/`--before`, `--kind t1|t3`.
+  `--author`, `--min-score`, `--after`/`--before`, `--type post|comment`.
 - **Topic dive / "what did I save about X"** → `reddit-cached research "<query>"`
   — deterministic markdown brief: seed matches, the stored discussion thread
   around each (including captured context), outbound links, subreddit counts.
@@ -116,8 +117,9 @@ Replies and mentions are also stored as context rows, so they show up in
 
 Interpret coverage before making claims:
 
-- `status` → `syncRuns[origin].lastRun` shows the latest run's mode, status
-  (`complete`/`partial`/`errored`/`cancelled`), fetched count, and
+- `status` → `syncRuns` is an array with one entry per origin; each entry has
+  `origin`, `lastRun` (the latest run's mode, status
+  (`complete`/`partial`/`errored`/`cancelled`), and fetched count), and
   `lastCompleteFullAt`. No entry means that origin was never synced.
 - **Saturation**: Reddit's API exposes only the newest ~1000 items per
   listing. A `saturated: true` run means orphan detection was skipped and

@@ -36,8 +36,11 @@ bun run --filter @reddit-cached/web build
 cd packages/cli && bun run src/index.ts --help
 ```
 
-CI (`.github/workflows/ci.yml`) runs this same routine on every push and pull
-request to `main`, plus the web e2e smoke suite as a second job.
+CI (`.github/workflows/ci.yml`) runs three jobs on every push and pull request
+to `main`: this same routine (`verify`), a `binary` job (`bun run
+build:binary` then `packages/cli/scripts/smoke-binary.sh` — proves the
+compiled single-file binary with embedded web assets boots, runs CLI commands,
+and serves the dashboard), and the web e2e smoke suite (`e2e`).
 
 ## What Each Check Proves
 
