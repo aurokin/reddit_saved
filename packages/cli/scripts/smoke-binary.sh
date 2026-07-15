@@ -36,8 +36,10 @@ cd "$TMP_DIR" # prove the binary is cwd-independent
 
 # --- CLI surface ---
 "$BINARY" --version >/dev/null || fail "--version"
-# CLI commands take --db; serve reads REDDIT_CACHED_DB (web app convention).
+# Every surface resolves the DB as --db > REDDIT_CACHED_DB > platform default;
+# prove both the flag and the env var (already exported above) paths work.
 "$BINARY" status --db "$REDDIT_CACHED_DB" | grep -q '"totalPosts"' || fail "status did not emit stats JSON"
+"$BINARY" status | grep -q '"totalPosts"' || fail "status did not honor REDDIT_CACHED_DB"
 
 # --- serve: API + embedded SPA ---
 # Refuse a squatted port: a stale server here would answer the checks below

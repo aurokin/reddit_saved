@@ -3,7 +3,7 @@
  * respects auth.lock, and exposes a singleton accessible via the Hono `c.var.app` context.
  */
 import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname } from "node:path";
 import {
   type ApiClientCallbacks,
   type AuthContext,
@@ -15,7 +15,7 @@ import {
   SqliteAdapter,
   TagManager,
   TokenManager,
-  paths,
+  resolveDatabasePath,
 } from "@reddit-cached/core";
 import { type AuthMode, selectAuthMode } from "./auth-routing";
 
@@ -38,12 +38,6 @@ export interface AppContext {
   dbPath: string;
   /** Currently running sync promise (single-flight). */
   activeSync: AbortController | null;
-}
-
-function resolveDbPath(): string {
-  const envPath = process.env.REDDIT_CACHED_DB;
-  if (envPath) return resolve(envPath);
-  return paths.database;
 }
 
 /**
@@ -135,7 +129,7 @@ export function getAppContext(): AppContext {
     );
   }
 
-  const dbPath = resolveDbPath();
+  const dbPath = resolveDatabasePath();
   mkdirSync(dirname(dbPath), { recursive: true });
 
   const storage = new SqliteAdapter(dbPath);

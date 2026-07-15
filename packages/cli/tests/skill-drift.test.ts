@@ -9,16 +9,7 @@ import { COMMANDS } from "../src/commands/registry";
  * this test forces the SKILL.md to be updated with it.
  */
 
-const SKILL_PATH = join(
-  import.meta.dir,
-  "..",
-  "..",
-  "..",
-  ".agents",
-  "skills",
-  "reddit-cached",
-  "SKILL.md",
-);
+const SKILL_PATH = join(import.meta.dir, "..", "..", "..", "skills", "reddit-cached", "SKILL.md");
 
 function extractSkillCommands(markdown: string): string[] {
   // Commands appear in inline code spans (`reddit-cached search "<q>"`) and in

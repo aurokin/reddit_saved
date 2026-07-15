@@ -5,19 +5,31 @@ description: "Search and analyze the user's Reddit saved/upvoted/submitted/comme
 
 # reddit-cached
 
-Use this for questions about the user's Reddit content before any live Reddit
-lookup. The archive is a local SQLite cache; every command below is offline
+Use the installed `reddit-cached` binary for questions about the user's Reddit
+content before any live Reddit lookup. This skill is for agents using
+reddit-cached to answer questions, not for agents developing reddit-cached
+itself. The archive is a local SQLite cache; every command below is offline
 except the sync commands — `fetch`, `import` (without `--dry-run`), `unsave`,
-and `jobs run`.
+and `jobs run`. All commands emit JSON by default; pass `--human` only for
+terminal display.
+
+If the user needs to install this skill, prefer the Skills CLI so
+agent-specific skill directories and lockfiles stay consistent:
+
+```bash
+npx skills add aurokin/reddit_cached --global --skill reddit-cached --agent codex claude-code --full-depth
+```
 
 ## Data
 
-Prefer:
+Use the `reddit-cached` binary on PATH. If it isn't installed, install it
+(`brew install aurokin/tap/reddit-cached`, the repo's `install.sh` one-liner,
+or `bunx reddit-cached` for a no-install run). As a last resort, query the
+SQLite database directly: `~/Library/Application Support/reddit-cached/reddit-cached.db`
+(Linux: `~/.local/share/reddit-cached/reddit-cached.db`).
 
-1. The CLI from the repo: `cd packages/cli && bun run src/index.ts <command>`
-2. An installed `reddit-cached` binary
-3. Direct SQLite as a last resort: `~/Library/Application Support/reddit-cached/reddit-cached.db`
-   (Linux: `~/.local/share/reddit-cached/reddit-cached.db`; override with `REDDIT_CACHED_DB`)
+Every command resolves the database as `--db <path>` > `REDDIT_CACHED_DB` env
+var > the platform default path above.
 
 Check health and freshness before analysis:
 
@@ -26,8 +38,7 @@ reddit-cached status
 ```
 
 The JSON includes totals, per-subreddit counts, `syncRuns` (per-origin
-provenance), and `resumeCursors`. All commands emit JSON by default; pass
-`--human` only for terminal display.
+provenance), and `resumeCursors`.
 
 ## Picking the Right Approach
 
@@ -58,9 +69,8 @@ provenance), and `resumeCursors`. All commands emit JSON by default; pass
 - **Bulk export for another tool** → `reddit-cached export --format
   json|csv|markdown`.
 - **Browse in a UI** → `reddit-cached serve` starts the local web dashboard
-  (API + SPA) at http://127.0.0.1:3001 (`--port` to change). Compiled binaries
-  ship with the SPA embedded; from a source checkout, build the web package
-  first.
+  (API + SPA) at http://127.0.0.1:3001 (`--port` to change). The installed
+  binary ships with the SPA embedded — no extra build step.
 - **Refresh the cache** → `reddit-cached fetch --all` (all four origins,
   incremental) or `reddit-cached fetch --type saved --full` for a full resync.
   Requires auth (browser-extension session or OAuth).
@@ -143,23 +153,3 @@ Backed up: posts (sharded by UTC year), tags, post_tags, sync_state,
 inbox_items, and a timestamp-free manifest. Deterministic — an unchanged
 database produces no commit. Not backed up: link_occurrences, sync_runs, FTS
 tables (all derived; `reddit-cached links rebuild` regenerates the link index).
-
-## Verification
-
-After changing queries/filters, run focused tests first:
-
-```bash
-bun test packages/core/tests/sqlite-adapter.test.ts packages/core/tests/quality.test.ts
-```
-
-After link-index, backup, or research changes:
-
-```bash
-bun test packages/core/tests/link-index.test.ts packages/core/tests/backup.test.ts packages/core/tests/research-brief.test.ts
-```
-
-Then the full gate from the repo root:
-
-```bash
-bun run verify
-```

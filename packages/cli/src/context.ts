@@ -16,7 +16,7 @@ import {
   SqliteAdapter,
   TagManager,
   TokenManager,
-  paths,
+  resolveDatabasePath,
 } from "@reddit-cached/core";
 import { clearProgress, printError, printProgress, printVerbose } from "./output";
 
@@ -47,7 +47,7 @@ export interface ContextOptions {
 }
 
 export async function createContext(opts: ContextOptions = {}): Promise<CliContext> {
-  const dbPath = opts.dbPath ?? paths.database;
+  const dbPath = resolveDatabasePath(opts.dbPath);
   const storage = new SqliteAdapter(dbPath);
   const tags = new TagManager(storage.getDb());
   const monitor = new PerformanceMonitor();

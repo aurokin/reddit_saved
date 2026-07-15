@@ -36,9 +36,11 @@ On tag push, `release.yml` runs:
   `packages/core/src/constants.ts` all match.
 - **Build release assets** — `bun run verify`, then packages four platform
   tarballs (`darwin-arm64`, `darwin-amd64`, `linux-amd64`, `linux-arm64`),
-  `reddit-cached-extension.zip`, and `SHA256SUMS`, then smoke-tests the
-  extracted linux-amd64 tarball with `packages/cli/scripts/smoke-binary.sh` —
-  the exact bytes that ship, not a rebuild.
+  `reddit-cached-extension.zip` (Chrome), `reddit-cached-extension-firefox.zip`
+  (same files with the Firefox manifest; ships from the first tag after
+  v0.1.0), and `SHA256SUMS`, then smoke-tests the extracted linux-amd64
+  tarball with `packages/cli/scripts/smoke-binary.sh` — the exact bytes that
+  ship, not a rebuild.
 - **Release** — creates a **draft** GitHub release with the assets and
   generated notes.
 

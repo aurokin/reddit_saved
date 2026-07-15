@@ -274,7 +274,12 @@ export type { TodayDigest, TodayDigestItem, TodayOptions } from "./research/toda
 export { PerformanceMonitor, formatDuration, formatBytes } from "./monitor/performance";
 
 // Utilities
-export { getCheckpointPathForDatabase, getJobLockPathForDatabase, paths } from "./utils/paths";
+export {
+  getCheckpointPathForDatabase,
+  getJobLockPathForDatabase,
+  paths,
+  resolveDatabasePath,
+} from "./utils/paths";
 export { JOB_LOCK_STALE_MS, acquireJobLock, readJobLock } from "./utils/job-lock";
 export type { JobLockInfo, JobLockRelease } from "./utils/job-lock";
 export { getConfigFilePath, loadConfig, saveConfig } from "./utils/config";

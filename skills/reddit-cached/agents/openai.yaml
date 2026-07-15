@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reddit Cached"
+  short_description: "Query the local Reddit archive"
+  default_prompt: "Use $reddit-cached to answer questions about the user's Reddit saves and history from the local archive."

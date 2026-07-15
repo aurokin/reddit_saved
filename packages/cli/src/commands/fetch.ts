@@ -7,7 +7,7 @@ import {
   createOriginCheckpointManager,
   detectOrphans,
   formatDuration,
-  paths,
+  resolveDatabasePath,
 } from "@reddit-cached/core";
 
 const ORIGIN_MAP: Record<string, ContentOrigin> = {
@@ -81,7 +81,10 @@ export async function runFetchForOrigin(
   const contentOrigin = ORIGIN_MAP[typeStr];
   const { isFull, limit, dbPath } = opts;
 
-  const stateManager = await createOriginCheckpointManager(dbPath ?? paths.database, contentOrigin);
+  const stateManager = await createOriginCheckpointManager(
+    resolveDatabasePath(dbPath),
+    contentOrigin,
+  );
   const loadedCheckpoint = await stateManager.load();
 
   // Build fetch options

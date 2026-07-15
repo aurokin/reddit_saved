@@ -204,6 +204,64 @@ describe("status command", () => {
   });
 });
 
+describe("status database resolution", () => {
+  const originalDbEnv = process.env.REDDIT_CACHED_DB;
+  let envDbPath: string;
+  let flagDbPath: string;
+
+  beforeEach(() => {
+    envDbPath = makeTempDb();
+    flagDbPath = makeTempDb();
+    setOutputMode(false, false, false);
+
+    const envAdapter = new SqliteAdapter(envDbPath);
+    envAdapter.upsertPosts([makeItem({ id: "env1" }), makeItem({ id: "env2" })], "saved");
+    envAdapter.close();
+
+    const flagAdapter = new SqliteAdapter(flagDbPath);
+    flagAdapter.upsertPosts([makeItem({ id: "flag1" })], "saved");
+    flagAdapter.close();
+  });
+
+  afterEach(() => {
+    if (originalDbEnv === undefined) {
+      delete process.env.REDDIT_CACHED_DB;
+    } else {
+      process.env.REDDIT_CACHED_DB = originalDbEnv;
+    }
+    rmSync(dirname(envDbPath), { recursive: true, force: true });
+    rmSync(dirname(flagDbPath), { recursive: true, force: true });
+  });
+
+  test("status honors REDDIT_CACHED_DB when --db is absent", async () => {
+    process.env.REDDIT_CACHED_DB = envDbPath;
+
+    const { statusCmd } = await import("../src/commands/status");
+    const cap = captureConsole();
+    try {
+      await statusCmd({});
+      const stats = JSON.parse(cap.logs[0]);
+      expect(stats.totalPosts).toBe(2);
+    } finally {
+      cap.restore();
+    }
+  });
+
+  test("--db wins over REDDIT_CACHED_DB when both are set", async () => {
+    process.env.REDDIT_CACHED_DB = envDbPath;
+
+    const { statusCmd } = await import("../src/commands/status");
+    const cap = captureConsole();
+    try {
+      await statusCmd({ db: flagDbPath });
+      const stats = JSON.parse(cap.logs[0]);
+      expect(stats.totalPosts).toBe(1);
+    } finally {
+      cap.restore();
+    }
+  });
+});
+
 describe("status warnings", () => {
   let dbPath: string;
   let adapter: SqliteAdapter;

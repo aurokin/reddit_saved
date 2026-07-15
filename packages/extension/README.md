@@ -35,10 +35,14 @@ Firefox unsigned extensions are temporary (cleared on browser restart). For a
 persistent install, use Firefox Developer Edition or Nightly with
 `xpinstall.signatures.required = false` in `about:config`.
 
-1. Run `bun run build` in `packages/extension`.
+1. Download `reddit-cached-extension-firefox.zip` from the
+   [releases page](https://github.com/aurokin/reddit_cached/releases) (releases
+   after v0.1.0 ship it). From a source checkout, run `bun run build` in
+   `packages/extension` instead and use `dist/firefox/`.
 2. Open `about:debugging#/runtime/this-firefox`.
 3. Click **Load Temporary Add-on…**.
-4. Select `packages/extension/dist/firefox/manifest.json`.
+4. Select the downloaded zip directly (or the `manifest.json` inside the
+   unzipped folder / `dist/firefox/`).
 5. The extension stays loaded until you close Firefox.
 
 For a permanent install in regular Firefox, you'd need to sign the extension via

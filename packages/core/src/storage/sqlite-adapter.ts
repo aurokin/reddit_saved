@@ -31,7 +31,7 @@ import type {
   SyncRunStatus,
   SyncRunSummary,
 } from "../types";
-import { paths } from "../utils/paths";
+import { resolveDatabasePath } from "../utils/paths";
 import { mapRedditItemToRow } from "./mapper";
 import {
   assertFts5Available as assertFts5,
@@ -217,7 +217,7 @@ export class SqliteAdapter implements StorageAdapter {
   private db: Database;
 
   constructor(dbPath?: string) {
-    const p = dbPath ?? paths.database;
+    const p = resolveDatabasePath(dbPath);
     mkdirSync(dirname(p), { recursive: true });
     this.db = new Database(p);
     initializeSchema(this.db);

@@ -1,5 +1,5 @@
 import { homedir, platform } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const APP_NAME = "reddit-cached";
 const CUSTOM_CONFIG_DIR_ENV = "REDDIT_CACHED_CONFIG_DIR";
@@ -73,6 +73,17 @@ export const paths = {
     return join(getDataDir(), "logs");
   },
 };
+
+/** Database path resolution shared by every surface (CLI, web, jobs):
+ *  explicit override (the `--db` flag) > `REDDIT_CACHED_DB` env var >
+ *  platform default. The env var is re-read on each call for testability,
+ *  matching `paths` above. */
+export function resolveDatabasePath(override?: string): string {
+  if (override) return override;
+  const envPath = process.env.REDDIT_CACHED_DB;
+  if (envPath) return resolve(envPath);
+  return paths.database;
+}
 
 /** Checkpoint file co-located with the database. With an origin, each sync
  *  origin gets its own file so concurrent/interleaved origin syncs can't

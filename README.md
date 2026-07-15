@@ -81,7 +81,8 @@ Open `http://127.0.0.1:3001`, then connect your Reddit session:
 
 1. Install the companion browser extension — download
    `reddit-cached-extension.zip` from the release page, unzip it, and "Load
-   unpacked" in Chrome (or load `packages/extension` from a checkout — see
+   unpacked" in Chrome (or load `packages/extension` from a checkout; for
+   Firefox and details see
    [packages/extension/README.md](./packages/extension/README.md)). It
    forwards your reddit.com session cookies to the local app. This is the
    primary auth mode; OAuth (`reddit-cached auth login`) is a legacy fallback
@@ -97,9 +98,9 @@ reddit-cached fetch inbox        # replies, mentions, messages
 
 The database lives in the platform data directory — macOS:
 `~/Library/Application Support/reddit-cached/reddit-cached.db`, Linux (XDG):
-`~/.local/share/reddit-cached/reddit-cached.db`. The web app honors
-`REDDIT_CACHED_DB=<path>`; the CLI takes `--db <path>`. By default the web UI
-and CLI share the same database and auth files.
+`~/.local/share/reddit-cached/reddit-cached.db`. Both the web app and the CLI
+honor `REDDIT_CACHED_DB=<path>`, and the CLI's `--db <path>` flag overrides it.
+By default the web UI and CLI share the same database and auth files.
 
 ## Scheduled syncs
 
@@ -164,9 +165,15 @@ reddit-cached today --window 7d                      # what's new digest
 ```
 
 There is an agent skill at
-[.agents/skills/reddit-cached/SKILL.md](./.agents/skills/reddit-cached/SKILL.md)
+[skills/reddit-cached/SKILL.md](./skills/reddit-cached/SKILL.md)
 that teaches agents when to reach for `search` vs `research` vs `links` vs
 `today`, and a drift guard test keeps it in sync with the real command surface.
+Install it with the Skills CLI:
+
+```bash
+npx skills add aurokin/reddit_cached --global --skill reddit-cached --agent codex claude-code --full-depth
+```
+
 The authoritative command reference is
 [docs/interfaces/cli.md](./docs/interfaces/cli.md).
 

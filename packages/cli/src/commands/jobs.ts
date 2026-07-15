@@ -11,6 +11,7 @@ import {
   loadConfig,
   paths,
   readJobLock,
+  resolveDatabasePath,
   syncContext,
   syncInbox,
 } from "@reddit-cached/core";
@@ -71,7 +72,7 @@ export async function jobsRunCmd(
   const trigger = flagStr(flags, "trigger") ?? "manual";
   const dbPath = flagStr(flags, "db");
 
-  const lockPath = getJobLockPathForDatabase(dbPath ?? paths.database);
+  const lockPath = getJobLockPathForDatabase(resolveDatabasePath(dbPath));
   const release = await acquireJobLock(lockPath);
   if (!release) {
     // Another run is in flight — skipping is the expected outcome for an
@@ -471,7 +472,7 @@ export async function jobsStatusCmd(
   const ctx = await createContext({ dbPath });
   try {
     const runs = ctx.storage.getJobRunSummaries(limit);
-    const lockPath = getJobLockPathForDatabase(dbPath ?? paths.database);
+    const lockPath = getJobLockPathForDatabase(resolveDatabasePath(dbPath));
     const lock = await readJobLock(lockPath);
 
     const now = Date.now();

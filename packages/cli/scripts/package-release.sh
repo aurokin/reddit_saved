@@ -11,6 +11,7 @@
 #   reddit-cached-linux-amd64.tar.gz
 #   reddit-cached-linux-arm64.tar.gz
 #   reddit-cached-extension.zip         (Chrome "load unpacked" contents)
+#   reddit-cached-extension-firefox.zip (same files, Firefox manifest)
 #   SHA256SUMS                          (GNU sha256sum format)
 #
 # Asset names use Go-style arch (x64 -> amd64) to match the owner's other
@@ -47,11 +48,13 @@ for entry in "${TARGETS[@]}"; do
   rm -rf "$stage"
 done
 
-# --- browser extension (Chrome build; "load unpacked"-ready contents) ---
+# --- browser extension (Chrome + Firefox builds; load-ready contents) ---
 # Run the build script with bun directly; the package.json script shells out
-# to node, which isn't otherwise required by this repo.
+# to node, which isn't otherwise required by this repo. It stages dist/chrome
+# and dist/firefox, each with the right manifest.json for its browser.
 (cd "$ROOT/packages/extension" && bun scripts/build.js)
 (cd "$ROOT/packages/extension/dist/chrome" && zip -qr "$OUT_DIR/reddit-cached-extension.zip" .)
+(cd "$ROOT/packages/extension/dist/firefox" && zip -qr "$OUT_DIR/reddit-cached-extension-firefox.zip" .)
 
 # --- checksums (GNU sha256sum format; shasum matches it on macOS) ---
 cd "$OUT_DIR"

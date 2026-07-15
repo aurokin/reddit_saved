@@ -43,6 +43,9 @@ reddit-cached jobs uninstall-systemd [--unit-name <name>]
 
 - The CLI is the operator and automation surface over the shared local SQLite
   database.
+- Every command resolves the database the same way: `--db <path>` >
+  `REDDIT_CACHED_DB` env var > platform default — the same precedence the web
+  app uses.
 - JSON-oriented output is the default shape for composable usage.
 - Filter flags, shared by `search`, `list`, and `export`: `--subreddit <r>`,
   `--tag <t>`, `--orphaned`, `--type post|comment`, `--hide-low-quality`,
