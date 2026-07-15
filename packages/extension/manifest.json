@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Reddit Cached (companion)",
-  "short_name": "RedditSaved",
+  "short_name": "RedditCached",
   "version": "0.1.1",
   "description": "Forwards your reddit.com session to the local Reddit Cached app on localhost.",
   "permissions": ["cookies", "storage", "alarms", "activeTab"],
