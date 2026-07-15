@@ -42,9 +42,10 @@ its own. Optional git backups go only to repositories you configure.
 
 ## Data retention and deletion
 
-All data lives in files you control. To delete it: remove the extension,
-disconnect the session from the app (or use the extension popup's disconnect,
-which also clears the forwarded session), and delete the app's data directory
+All data lives in files you control. Logging out of reddit.com is enough to
+revoke access: the extension detects it and clears the forwarded session from
+the local app automatically. To remove everything, also remove the extension
+and delete the app's data directory
 (macOS: `~/Library/Application Support/reddit-cached`, Linux:
 `~/.local/share/reddit-cached`).
 
