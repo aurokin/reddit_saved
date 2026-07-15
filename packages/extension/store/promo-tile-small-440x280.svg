@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 280">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fb8b3c"/>
+      <stop offset="1" stop-color="#ef5f0a"/>
+    </linearGradient>
+  </defs>
+  <rect width="440" height="280" fill="url(#bg)"/>
+  <g transform="translate(39.6 63) scale(6.416666666666667)">
+    <path fill="#ffffff" d="M6.5 2h11A1.5 1.5 0 0 1 19 3.5V22a.75.75 0 0 1-1.16.63L12 18.6l-5.84 4.03A.75.75 0 0 1 5 22V3.5A1.5 1.5 0 0 1 6.5 2Z"/>
+  </g>
+  <text x="174.9" y="131.6" font-family="Helvetica Neue, Helvetica, Arial" font-weight="bold" font-size="44.800000000000004" fill="#ffffff" dominant-baseline="middle">Reddit Cached</text>
+  <text x="174.9" y="173.6" font-family="Helvetica Neue, Helvetica, Arial" font-size="21" fill="#ffffff" fill-opacity="0.92" dominant-baseline="middle">Your Reddit, archived on your own machine</text>
+</svg>
