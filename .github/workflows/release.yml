@@ -147,6 +147,7 @@ jobs:
           files: |
             dist-release/*.tar.gz
             dist-release/reddit-cached-extension.zip
+            dist-release/reddit-cached-extension-firefox.zip
             dist-release/SHA256SUMS
           body: |
             ## Install
@@ -185,6 +186,7 @@ jobs:
             - `reddit-cached-linux-amd64.tar.gz` — Linux x86_64
             - `reddit-cached-linux-arm64.tar.gz` — Linux ARM64
             - `reddit-cached-extension.zip` — companion browser extension (unzip, then "Load unpacked" in Chrome)
+            - `reddit-cached-extension-firefox.zip` — companion browser extension (unzip, then "Load Temporary Add-on" in Firefox)
 
   publish-npm:
     name: Publish to npm

@@ -10,8 +10,9 @@ content before any live Reddit lookup. This skill is for agents using
 reddit-cached to answer questions, not for agents developing reddit-cached
 itself. The archive is a local SQLite cache; every command below is offline
 except the sync commands — `fetch`, `import` (without `--dry-run`), `unsave`,
-and `jobs run`. All commands emit JSON by default; pass `--human` only for
-terminal display.
+and `jobs run`. Commands emit JSON by default (pass `--human` only for
+terminal display), except `research` and `today`, which print a markdown
+brief/digest by default and take `--json` for structured output.
 
 If the user needs to install this skill, prefer the Skills CLI so
 agent-specific skill directories and lockfiles stay consistent:
