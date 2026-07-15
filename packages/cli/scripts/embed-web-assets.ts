@@ -15,14 +15,18 @@
 import { existsSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-/** Dist-relative POSIX paths of every file under distDir, sorted. */
+/**
+ * Dist-relative POSIX paths of every file under distDir, sorted. Sourcemaps
+ * (vite builds with `sourcemap: true` for dev debugging) are excluded — the
+ * ~2.4MB map would otherwise dominate every compiled binary and npm package.
+ */
 export function listDistFiles(distDir: string, prefix = ""): string[] {
   const files: string[] = [];
   for (const entry of readdirSync(join(distDir, prefix), { withFileTypes: true })) {
     const relPath = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
     if (entry.isDirectory()) {
       files.push(...listDistFiles(distDir, relPath));
-    } else if (entry.isFile()) {
+    } else if (entry.isFile() && !entry.name.endsWith(".map")) {
       files.push(relPath);
     }
   }

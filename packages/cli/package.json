@@ -1,6 +1,7 @@
 {
   "name": "@reddit-cached/cli",
   "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "reddit-cached": "./src/index.ts"

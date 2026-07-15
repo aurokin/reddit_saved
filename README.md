@@ -46,20 +46,37 @@ unsave.
 
 ## Install & setup
 
-Requires [Bun](https://bun.sh).
+The `reddit-cached` binary bundles the CLI and the web dashboard. Pick a
+channel:
 
 ```bash
-git clone https://github.com/aurokin/reddit_cached && cd reddit_cached
-bun install
-cd packages/web
-bun run build
-bun run start
+# One-liner (macOS/Linux, installs to ~/.local/bin)
+curl -fsSL https://raw.githubusercontent.com/aurokin/reddit_cached/main/install.sh | bash
+
+# Homebrew
+brew install aurokin/tap/reddit-cached
+
+# npm, if you have Bun (https://bun.sh) installed
+bunx reddit-cached --help
+```
+
+Or download a platform tarball from the
+[releases page](https://github.com/aurokin/reddit_cached/releases) and verify
+it against `SHA256SUMS`. To run from a source checkout instead, see
+[Development](#development).
+
+Start the dashboard:
+
+```bash
+reddit-cached serve
 ```
 
 Open `http://127.0.0.1:3001`, then connect your Reddit session:
 
-1. Install the companion browser extension (load `packages/extension` unpacked
-   — see [packages/extension/README.md](./packages/extension/README.md)). It
+1. Install the companion browser extension — download
+   `reddit-cached-extension.zip` from the release page, unzip it, and "Load
+   unpacked" in Chrome (or load `packages/extension` from a checkout — see
+   [packages/extension/README.md](./packages/extension/README.md)). It
    forwards your reddit.com session cookies to the local app. This is the
    primary auth mode; OAuth (`reddit-cached auth login`) is a legacy fallback
    for users with a registered Reddit app.
@@ -67,17 +84,9 @@ Open `http://127.0.0.1:3001`, then connect your Reddit session:
    CLI. The extension session is enough for CLI fetches too:
 
 ```bash
-cd packages/cli
-bun run src/index.ts fetch --all        # saved, upvoted, submitted, comments
-bun run src/index.ts fetch context      # capture thread context around saves
-bun run src/index.ts fetch inbox        # replies, mentions, messages
-```
-
-To get a standalone `reddit-cached` binary, compile it once and put it on your
-PATH:
-
-```bash
-bun run build:binary   # emits packages/cli/dist/reddit-cached (CLI + web dashboard)
+reddit-cached fetch --all        # saved, upvoted, submitted, comments
+reddit-cached fetch context      # capture thread context around saves
+reddit-cached fetch inbox        # replies, mentions, messages
 ```
 
 The database lives in the platform data directory — macOS:
@@ -153,6 +162,17 @@ The authoritative command reference is
 [docs/interfaces/cli.md](./docs/interfaces/cli.md).
 
 ## Development
+
+Requires [Bun](https://bun.sh). From a source checkout you can run the CLI
+directly (`cd packages/cli && bun run src/index.ts`), serve the dashboard
+(`cd packages/web && bun run build && bun run start`), or compile the
+standalone binary:
+
+```bash
+git clone https://github.com/aurokin/reddit_cached && cd reddit_cached
+bun install
+bun run build:binary   # emits packages/cli/dist/reddit-cached (CLI + web dashboard)
+```
 
 Run the whole stack against deterministic fixture data — no Reddit account
 needed:

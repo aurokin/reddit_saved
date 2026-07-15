@@ -24,7 +24,15 @@
     "lineWidth": 100
   },
   "files": {
-    "ignore": ["node_modules", "dist", "reference", "test-results", "**/*.generated.ts"]
+    "ignore": [
+      "node_modules",
+      "dist",
+      "dist-release",
+      "dist-npm",
+      "reference",
+      "test-results",
+      "**/*.generated.ts"
+    ]
   },
   "overrides": [
     {

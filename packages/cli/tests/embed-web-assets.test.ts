@@ -34,6 +34,15 @@ describe("listDistFiles", () => {
     ]);
   });
 
+  test("excludes sourcemaps", () => {
+    mkdirSync(join(distDir, "assets"), { recursive: true });
+    writeFileSync(join(distDir, "index.html"), "<html></html>");
+    writeFileSync(join(distDir, "assets", "index-abc123.js"), "console.log(1);");
+    writeFileSync(join(distDir, "assets", "index-abc123.js.map"), "{}");
+
+    expect(listDistFiles(distDir)).toEqual(["assets/index-abc123.js", "index.html"]);
+  });
+
   test("returns an empty list for an empty dist", () => {
     expect(listDistFiles(distDir)).toEqual([]);
   });
